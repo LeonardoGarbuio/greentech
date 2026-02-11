@@ -1,4 +1,5 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'; // Use relative path for Vercel if not set
+const isProd = import.meta.env.PROD;
+export const API_BASE_URL = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3002');
 
 export const api = {
     // User endpoints

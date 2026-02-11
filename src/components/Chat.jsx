@@ -1,10 +1,10 @@
-import React from 'react';
+import { API_BASE_URL } from '../services/api';
 
 const Chat = ({ onNavigate }) => {
     const [conversations, setConversations] = React.useState([]);
 
     React.useEffect(() => {
-        fetch('http://localhost:3002/api/messages')
+        fetch(`${API_BASE_URL}/messages`)
             .then(res => res.json())
             .then(data => setConversations(data))
             .catch(err => console.error("Failed to fetch messages:", err));
