@@ -1,9 +1,9 @@
-export const API_BASE_URL = 'http://localhost:3002';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'; // Use relative path for Vercel if not set
 
 export const api = {
     // User endpoints
     login: async (email, password) => {
-        const response = await fetch(`${API_BASE_URL}/api/login`, {
+        const response = await fetch(`${API_BASE_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -12,13 +12,13 @@ export const api = {
     },
 
     getUserStats: async (userId, role) => {
-        const response = await fetch(`${API_BASE_URL}/api/user?id=${userId}&role=${role}`);
+        const response = await fetch(`${API_BASE_URL}/user?id=${userId}&role=${role}`);
         if (!response.ok) throw new Error('Failed to fetch user stats');
         return response.json();
     },
 
     getHistory: async (userId, role) => {
-        const response = await fetch(`${API_BASE_URL}/api/history?userId=${userId}&role=${role}`);
+        const response = await fetch(`${API_BASE_URL}/history?userId=${userId}&role=${role}`);
         if (!response.ok) throw new Error('Failed to fetch history');
         return response.json();
     },
@@ -26,14 +26,14 @@ export const api = {
     // Item endpoints
     getItems: async (userId, role) => {
         const url = role === 'collector' && userId
-            ? `${API_BASE_URL}/api/items?collectorId=${userId}`
-            : `${API_BASE_URL}/api/items`;
+            ? `${API_BASE_URL}/items?collectorId=${userId}`
+            : `${API_BASE_URL}/items`;
         const response = await fetch(url);
         return response.json();
     },
 
     createItem: async (item, producerId) => {
-        const response = await fetch(`${API_BASE_URL}/api/items`, {
+        const response = await fetch(`${API_BASE_URL}/items`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...item, producer_id: producerId })
@@ -42,7 +42,7 @@ export const api = {
     },
 
     updateItemStatus: async (itemId, status, collectorId) => {
-        const response = await fetch(`${API_BASE_URL}/api/items/${itemId}/status`, {
+        const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status, collector_id: collectorId })
@@ -51,7 +51,7 @@ export const api = {
     },
 
     deleteItem: async (itemId) => {
-        const response = await fetch(`${API_BASE_URL}/api/items/${itemId}`, {
+        const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
             method: 'DELETE',
         });
         return response.json(); // May be empty or status only
@@ -59,19 +59,19 @@ export const api = {
 
     // Notifications & Addresses
     getNotifications: async (userId, role) => {
-        const response = await fetch(`${API_BASE_URL}/api/notifications?userId=${userId}&role=${role}`);
+        const response = await fetch(`${API_BASE_URL}/notifications?userId=${userId}&role=${role}`);
         if (!response.ok) throw new Error('Failed to fetch notifications');
         return response.json();
     },
 
     getAddresses: async (userId, role) => {
-        const response = await fetch(`${API_BASE_URL}/api/addresses?userId=${userId}&role=${role}`);
+        const response = await fetch(`${API_BASE_URL}/addresses?userId=${userId}&role=${role}`);
         if (!response.ok) throw new Error('Failed to fetch addresses');
         return response.json();
     },
 
     addAddress: async (address) => {
-        const response = await fetch(`${API_BASE_URL}/api/addresses`, {
+        const response = await fetch(`${API_BASE_URL}/addresses`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(address)
@@ -81,13 +81,13 @@ export const api = {
     },
 
     deleteAddress: async (id) => {
-        const response = await fetch(`${API_BASE_URL}/api/addresses/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_BASE_URL}/addresses/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete address');
         return response.json();
     },
 
     updateUser: async (userData) => {
-        const response = await fetch(`${API_BASE_URL}/api/user`, {
+        const response = await fetch(`${API_BASE_URL}/user`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)

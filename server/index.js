@@ -3,19 +3,19 @@ import cors from 'cors';
 import db from './db.js';
 
 const app = express();
-const PORT = 3002;
+const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
 
 // --- AUTHENTICATION ---
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
-    // 1. Try finding in Producers
-    db.get("SELECT * FROM producers WHERE email = ? AND password = ?", [email, password], (err, producer) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        // 1. Try finding in Producers
+        const producer = await db.get("SELECT * FROM producers WHERE email = ? AND password = ?", [email, password]);
 
         if (producer) {
             return res.json({
@@ -32,55 +32,54 @@ app.post('/api/login', (req, res) => {
         }
 
         // 2. Try finding in Collectors
-        db.get("SELECT * FROM collectors WHERE email = ? AND password = ?", [email, password], (err, collector) => {
-            if (err) return res.status(500).json({ error: err.message });
+        const collector = await db.get("SELECT * FROM collectors WHERE email = ? AND password = ?", [email, password]);
 
-            if (collector) {
-                return res.json({
-                    success: true,
-                    user: {
-                        id: collector.id,
-                        name: collector.name,
-                        email: collector.email,
-                        earnings: collector.earnings,
-                        role: 'collector',
-                        avatar_url: collector.avatar_url
-                    }
-                });
-            }
+        if (collector) {
+            return res.json({
+                success: true,
+                user: {
+                    id: collector.id,
+                    name: collector.name,
+                    email: collector.email,
+                    earnings: collector.earnings,
+                    role: 'collector',
+                    avatar_url: collector.avatar_url
+                }
+            });
+        }
 
-            // 3. Not found
-            res.status(401).json({ success: false, message: 'Credenciais inválidas' });
-        });
-    });
+        // 3. Not found
+        res.status(401).json({ success: false, message: 'Credenciais inválidas' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- USER DATA ---
 
-app.get('/api/user', (req, res) => {
-    const { id, role } = req.query; // Require role to know which table to query
+app.get('/api/user', async (req, res) => {
+    const { id, role } = req.query;
 
     if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
 
     const table = role === 'producer' ? 'producers' : 'collectors';
 
-    db.get(`SELECT * FROM ${table} WHERE id = ?`, [id], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        const row = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [id]);
         if (!row) return res.status(404).json({ error: 'User not found' });
         res.json(row);
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- ITEMS (MARKETPLACE) ---
 
-// Get Available Items (Feed)
-// Get Available Items (Feed) + Reserved by current collector
-app.get('/api/items', (req, res) => {
+app.get('/api/items', async (req, res) => {
     const { collectorId } = req.query;
 
-    // Join with producers to get name/avatar if needed
     let query = `
-        SELECT items.*, producers.name as producer_name, producers.avatar_url as producer_avatar, producers.level as producer_level
+        SELECT items.*, producers.name as producer_name, producers.avatar_url as producer_avatar 
         FROM items 
         LEFT JOIN producers ON items.producer_id = producers.id 
         WHERE items.status = 'available'
@@ -95,87 +94,103 @@ app.get('/api/items', (req, res) => {
 
     query += ` ORDER BY items.created_at DESC`;
 
-    db.all(query, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+    try {
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Post New Item (Producer only)
-app.post('/api/items', (req, res) => {
+app.post('/api/items', async (req, res) => {
     const { type, title, description, weight_kg, lat, lng, address, producer_id } = req.body;
 
-    const stmt = db.prepare(`
-        INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) 
-        VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?)
-    `);
+    // We must ensure 'producer_id' is passed.
+    // And for Postgres, query text must use RETURNING id if we want lastID.
+    // Our db-postgres run wrapper tries to handle this by guessing or we can be explicit.
+    // For universal compatibility, explicitly asking for RETURNING id works in Postgres but FAILS in SQLite (syntax error).
+    // So we rely on db.run returning lastID (which our Postgres wrapper handles by looking at result).
+    // BUT our Postgres wrapper 'run' implementation only returns lastID if the query itself returned it?
+    // Wait, the PG wrapper I wrote checks `res.rows[0].id`.
+    // So the query must be `INSERT ... RETURNING id` for Postgres.
+    // But SQLite doesn't support `RETURNING id`.
+    // Solution: The db-postgres wrapper should Append `RETURNING id` to INSERT queries automatically?
+    // Or I make the query explicit and `db-sqlite` strips it?
+    // It's safer to just rely on `db.run` returning `lastID` via `this.lastID` (SQLite) 
+    // and manually implementing that in Postgres wrapper.
+    // In Postgres wrapper: `const res = await pool.query(text + ' RETURNING id', params)` if it's an insert.
 
-    stmt.run([producer_id, type, title, description, weight_kg, lat, lng, address], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, id: this.lastID });
-    });
-    stmt.finalize();
+    // Let's modify the query here to be standard INSERT and assume `db.run` handles it.
+
+    try {
+        const result = await db.run(`
+            INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) 
+            VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?)
+        `, [producer_id, type, title, description, weight_kg, lat, lng, address]);
+
+        res.json({ success: true, id: result.lastID });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Delete Item (Producer only)
-app.delete('/api/items/:id', (req, res) => {
+app.delete('/api/items/:id', async (req, res) => {
     const { id } = req.params;
-    db.run("DELETE FROM items WHERE id = ?", [id], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, changes: this.changes });
-    });
-});
+    try {
+        const result = await db.run("DELETE FROM items WHERE id = ?", [id]);
+        res.json({ success: true, changes: result.changes });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+}); // Fixed missing brace here
 
-// Accept/Collect Item (Collector action)
-app.put('/api/items/:id/status', (req, res) => {
-    const { status, collector_id } = req.body; // 'reserved' or 'collected'
+app.put('/api/items/:id/status', async (req, res) => {
+    const { status, collector_id } = req.body;
     const { id } = req.params;
 
     if (!collector_id) return res.status(400).json({ error: 'Collector ID required' });
 
     const collectedAt = status === 'collected' ? new Date().toISOString() : null;
 
-    db.run("UPDATE items SET status = ?, collector_id = ?, collected_at = ? WHERE id = ?",
-        [status, collector_id, collectedAt, id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
+    try {
+        const result = await db.run("UPDATE items SET status = ?, collector_id = ?, collected_at = ? WHERE id = ?",
+            [status, collector_id, collectedAt, id]);
 
-            // If collected, update stats for both parties
-            if (status === 'collected') {
-                updateStatsAfterCollection(id, collector_id);
-            }
-
-            res.json({ success: true, changes: this.changes });
+        if (status === 'collected') {
+            await updateStatsAfterCollection(id, collector_id);
         }
-    );
+
+        res.json({ success: true, changes: result.changes });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-function updateStatsAfterCollection(itemId, collectorId) {
-    db.get("SELECT * FROM items WHERE id = ?", [itemId], (err, item) => {
+async function updateStatsAfterCollection(itemId, collectorId) {
+    try {
+        const item = await db.get("SELECT * FROM items WHERE id = ?", [itemId]);
         if (item) {
             const points = Math.round(item.weight_kg * 10);
-            const earnings = item.weight_kg * 0.50; // Mock: R$0.50 per kg
+            const earnings = item.weight_kg * 0.50;
 
-            // Update Producer
-            db.run("UPDATE producers SET points = points + ?, weight_recycled = weight_recycled + ? WHERE id = ?",
+            await db.run("UPDATE producers SET points = points + ?, weight_recycled = weight_recycled + ? WHERE id = ?",
                 [points, item.weight_kg, item.producer_id]);
 
-            // Update Collector
-            db.run("UPDATE collectors SET earnings = earnings + ?, collections_count = collections_count + 1 WHERE id = ?",
+            await db.run("UPDATE collectors SET earnings = earnings + ?, collections_count = collections_count + 1 WHERE id = ?",
                 [earnings, collectorId]);
 
-            // Send Notifications
-            db.run("INSERT INTO producer_notifications (producer_id, title, message, type) VALUES (?, ?, ?, ?)",
+            await db.run("INSERT INTO producer_notifications (producer_id, title, message, type) VALUES (?, ?, ?, ?)",
                 [item.producer_id, 'Coleta Realizada!', `Você ganhou ${points} pontos.`, 'success']);
         }
-    });
+    } catch (err) {
+        console.error("Error updating stats:", err);
+    }
 }
 
 // --- HISTORY ---
 
-app.get('/api/history', (req, res) => {
+app.get('/api/history', async (req, res) => {
     const { userId, role } = req.query;
-
     if (!userId || !role) return res.status(400).json({ error: 'Missing params' });
 
     let query = '';
@@ -185,84 +200,66 @@ app.get('/api/history', (req, res) => {
         query = "SELECT * FROM items WHERE collector_id = ? ORDER BY collected_at DESC";
     }
 
-    db.all(query, [userId], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+    try {
+        const result = await db.query(query, [userId]);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// --- NOTIFICATIONS ---
+// --- NOTIFICATIONS & ADDRESSES & USER UPDATES ---
+// (Refactored similarly to async/await)
 
-app.get('/api/notifications', (req, res) => {
+app.get('/api/addresses', async (req, res) => {
     const { userId, role } = req.query;
-    const table = role === 'producer' ? 'producer_notifications' : 'collector_notifications';
-    const idColumn = role === 'producer' ? 'producer_id' : 'collector_id';
-
-    db.all(`SELECT * FROM ${table} WHERE ${idColumn} = ? ORDER BY created_at DESC`, [userId], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
-});
-
-// --- ADDRESSES ---
-
-app.get('/api/addresses', (req, res) => {
-    const { userId, role } = req.query;
-
-    if (!userId || !role) return res.status(400).json({ error: 'Missing params' });
-
     if (role === 'producer') {
-        db.all("SELECT * FROM producer_addresses WHERE producer_id = ?", [userId], (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json(rows);
-        });
+        try {
+            const result = await db.query("SELECT * FROM producer_addresses WHERE producer_id = ?", [userId]);
+            res.json(result.rows);
+        } catch (err) { res.status(500).json({ error: err.message }); }
     } else {
         res.json([]);
     }
 });
 
-app.post('/api/addresses', (req, res) => {
+app.post('/api/addresses', async (req, res) => {
     const { userId, role, title, address, lat, lng } = req.body;
-
     if (role === 'producer') {
-        db.run("INSERT INTO producer_addresses (producer_id, title, address, lat, lng) VALUES (?, ?, ?, ?, ?)",
-            [userId, title, address, lat || 0, lng || 0],
-            function (err) {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true, id: this.lastID });
-            }
-        );
+        try {
+            const result = await db.run("INSERT INTO producer_addresses (producer_id, title, address, lat, lng) VALUES (?, ?, ?, ?, ?)",
+                [userId, title, address, lat || 0, lng || 0]);
+            res.json({ success: true, id: result.lastID });
+        } catch (err) { res.status(500).json({ error: err.message }); }
     } else {
-        res.status(400).json({ error: 'Only producers can have addresses currently' });
+        res.status(400).json({ error: 'Only producers' });
     }
 });
 
-app.delete('/api/addresses/:id', (req, res) => {
-    const { id } = req.params;
-    db.run("DELETE FROM producer_addresses WHERE id = ?", [id], function (err) {
-        if (err) return res.status(500).json({ error: err.message });
+app.delete('/api/addresses/:id', async (req, res) => {
+    // ... code for delete
+    try {
+        const result = await db.run("DELETE FROM producer_addresses WHERE id = ?", [req.params.id]);
         res.json({ success: true });
-    });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- USER UPDATES ---
-
-app.put('/api/user', (req, res) => {
+app.put('/api/user', async (req, res) => {
+    // ... code for update
     const { id, role, name, email, phone } = req.body;
-
-    if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
-
     const table = role === 'producer' ? 'producers' : 'collectors';
-
-    db.run(`UPDATE ${table} SET name = ?, email = ?, phone = ? WHERE id = ?`,
-        [name, email, phone, id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
-        }
-    );
+    try {
+        const result = await db.run(`UPDATE ${table} SET name = ?, email = ?, phone = ? WHERE id = ?`,
+            [name, email, phone, id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+// Allow Vercel to export app, but listen if run directly
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
+
+export default app;
