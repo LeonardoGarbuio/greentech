@@ -1,0 +1,121 @@
+:root {
+  /* Friendly Professional Palette */
+  --primary-color: #27ae60;
+  /* Brighter Green - Friendly & Trustworthy */
+  --primary-light: #e8f5e9;
+  /* Very Light Green for backgrounds */
+  --secondary-color: #34495e;
+  /* Soft Slate - Professional */
+  --accent-color: #f1c40f;
+  /* Playful Yellow - Energy */
+  --accent-pop: #e67e22;
+  /* Orange for CTAs - Fun */
+
+  --bg-color: #f4f6f8;
+  /* Soft Grey */
+  --surface-color: #ffffff;
+  --surface-border: #e0e0e0;
+
+  --text-primary: #2c3e50;
+  /* Dark Slate */
+  --text-secondary: #7f8c8d;
+  /* Grey */
+
+  /* Soft Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.1);
+  --primary-glow: rgba(39, 174, 96, 0.3);
+
+  --font-main: 'Outfit', sans-serif;
+  --radius-md: 16px;
+  /* Softer, friendlier corners */
+  --radius-lg: 24px;
+  /* Very round for cards */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  min-height: 100dvh;
+  /* Mobile viewport fix */
+  overflow-x: hidden;
+}
+
+button {
+  font-family: var(--font-main);
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--surface-color);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  box-shadow: 0 4px 12px var(--primary-glow);
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Hide scrollbar for horizontal lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
