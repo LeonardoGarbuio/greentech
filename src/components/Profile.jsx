@@ -25,6 +25,9 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                 setAddresses(Array.isArray(addressesData) ? addressesData : []);
             } catch (error) {
                 console.error("Failed to fetch profile data:", error);
+                // Allow user to logout if data fails (e.g. user deleted or db reset)
+                alert("Erro ao carregar perfil. Por favor, faça login novamente.");
+                onLogout();
             }
         };
         fetchData();

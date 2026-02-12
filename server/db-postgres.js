@@ -38,19 +38,19 @@ export const get = async (text, params = []) => {
 
 export const run = async (text, params = []) => {
     if (!pool) throw new Error("Postgres Pool not initialized");
-    const { text: newText } = convertQuery(text, params);
+
+    // Automatically append RETURNING id for INSERTs if not present
+    let modifiedText = text;
+    if (text.trim().toUpperCase().startsWith("INSERT") && !text.toLowerCase().includes("returning")) {
+        modifiedText += " RETURNING id";
+    }
+
+    const { text: newText } = convertQuery(modifiedText, params);
     const res = await pool.query(newText, params);
 
-    // PG doesn't return lastID easily unless INSERT ... RETURNING id
-    // We might need to handle this if the app relies on lastID.
-    // In `server/index.js`, `lastID` is used after Insert.
-    // So we should append `RETURNING id` if it's an INSERT and not present.
-
     let lastID = null;
-    if (text.trim().toUpperCase().startsWith("INSERT")) {
-        if (res.rows && res.rows.length > 0) {
-            lastID = res.rows[0].id;
-        }
+    if (res.rows && res.rows.length > 0) {
+        lastID = res.rows[0].id;
     }
 
     return {
@@ -81,9 +81,6 @@ export const initDb = async () => {
                 avatar_url TEXT
             )`);
 
-            // ... (Add other tables with SERIAL instead of AUTOINCREMENT)
-            // For brevity in this thought trace, I will populate them.
-
             await client.query(`CREATE TABLE IF NOT EXISTS producer_notifications (
                 id SERIAL PRIMARY KEY,
                 producer_id INTEGER REFERENCES producers(id),
@@ -94,24 +91,17 @@ export const initDb = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )`);
 
-            // ... (Others)
-            await client.query(`CREATE TABLE IF NOT EXISTS items (
+            await client.query(`CREATE TABLE IF NOT EXISTS producer_addresses (
                 id SERIAL PRIMARY KEY,
                 producer_id INTEGER REFERENCES producers(id),
-                collector_id INTEGER, -- REFERENCES collectors(id) can be added later
-                type TEXT, 
                 title TEXT,
-                description TEXT,
-                weight_kg REAL,
-                status TEXT DEFAULT 'available',
+                address TEXT,
                 lat REAL,
                 lng REAL,
-                address TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                collected_at TIMESTAMP
+                is_default INTEGER DEFAULT 0
             )`);
 
-            // Need to define all tables properly for FKs to work.
+            // Collectors
             await client.query(`CREATE TABLE IF NOT EXISTS collectors (
                 id SERIAL PRIMARY KEY,
                 email TEXT UNIQUE,
@@ -125,8 +115,65 @@ export const initDb = async () => {
                 avatar_url TEXT
             )`);
 
+            await client.query(`CREATE TABLE IF NOT EXISTS collector_notifications (
+                id SERIAL PRIMARY KEY,
+                collector_id INTEGER REFERENCES collectors(id),
+                title TEXT,
+                message TEXT,
+                type TEXT,
+                is_read INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`);
+
+            await client.query(`CREATE TABLE IF NOT EXISTS collector_zones (
+                id SERIAL PRIMARY KEY,
+                collector_id INTEGER REFERENCES collectors(id),
+                title TEXT,
+                lat REAL,
+                lng REAL,
+                radius_km REAL
+            )`);
+
+            // Items
+            await client.query(`CREATE TABLE IF NOT EXISTS items (
+                id SERIAL PRIMARY KEY,
+                producer_id INTEGER REFERENCES producers(id),
+                collector_id INTEGER, 
+                type TEXT, 
+                title TEXT,
+                description TEXT,
+                weight_kg REAL,
+                status TEXT DEFAULT 'available',
+                lat REAL,
+                lng REAL,
+                address TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                collected_at TIMESTAMP
+            )`);
+
+            // Chats & Messages
+            await client.query(`CREATE TABLE IF NOT EXISTS chats (
+                id SERIAL PRIMARY KEY,
+                producer_id INTEGER REFERENCES producers(id),
+                collector_id INTEGER REFERENCES collectors(id),
+                last_message TEXT,
+                last_message_time TIMESTAMP
+            )`);
+
+            await client.query(`CREATE TABLE IF NOT EXISTS messages (
+                id SERIAL PRIMARY KEY,
+                chat_id INTEGER REFERENCES chats(id),
+                sender_role TEXT,
+                content TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_read INTEGER DEFAULT 0
+            )`);
 
             await client.query('COMMIT');
+
+            // Seed Data
+            await seedData(client);
+
         } catch (e) {
             await client.query('ROLLBACK');
             throw e;
@@ -136,6 +183,38 @@ export const initDb = async () => {
     } catch (err) {
         console.error("Failed to init Postgres DB:", err);
     }
+};
+
+const seedData = async (client) => {
+    // Check if producers exist
+    const res = await client.query("SELECT count(*) as count FROM producers");
+    if (res.rows[0].count > 0) return;
+
+    console.log("Seeding Postgres Data...");
+
+    // Insert Producer matching seed
+    const producerRes = await client.query(`
+        INSERT INTO producers (email, password, name, phone, points, weight_recycled, level) 
+        VALUES ('producer@test.com', 'password', 'João Doador', '(11) 99999-9999', 1250, 55.5, 'Reciclador Consciente')
+        RETURNING id
+    `);
+    const producerId = producerRes.rows[0].id;
+
+    await client.query(`
+        INSERT INTO producer_notifications (producer_id, title, message, type) 
+        VALUES ($1, 'Bem-vindo!', 'Comece a reciclar hoje mesmo.', 'system')
+    `, [producerId]);
+
+    await client.query(`
+        INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) 
+        VALUES ($1, 'paper', 'Papelão Limpo', 'Caixas de mudança desmontadas', 5.0, 'available', -23.5500, -46.6300, 'Rua das Flores, 123')
+    `, [producerId]);
+
+    // Insert Collector
+    await client.query(`
+        INSERT INTO collectors (email, password, name, phone, earnings, collections_count, vehicle_type) 
+        VALUES ('collector@test.com', 'password', 'Maria Coletora', '(11) 98888-8888', 350.00, 12, 'carroca')
+    `);
 };
 
 export default { query, get, run, initDb };
