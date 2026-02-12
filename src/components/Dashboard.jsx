@@ -6,6 +6,9 @@ import { api } from '../services/api';
 const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, currentUserId }) => {
     const [selectedItemId, setSelectedItemId] = useState(null);
     const [activeCategory, setActiveCategory] = useState('all');
+
+    console.log("Dashboard Items Prop:", items);
+    console.log("Dashboard UserRole:", userRole);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [filterDistance, setFilterDistance] = useState(50); // km
     const [filterWeight, setFilterWeight] = useState(0); // kg

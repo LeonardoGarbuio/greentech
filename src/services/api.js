@@ -29,8 +29,11 @@ export const api = {
         const url = role === 'collector' && userId
             ? `${API_BASE_URL}/items?collectorId=${userId}`
             : `${API_BASE_URL}/items`;
+        console.log("Fetching items from:", url);
         const response = await fetch(url);
-        return response.json();
+        const data = await response.json();
+        console.log("Items fetched:", data);
+        return data;
     },
 
     createItem: async (item, producerId) => {
