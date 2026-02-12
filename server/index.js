@@ -8,6 +8,20 @@ const PORT = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 
+// Health Check / DB Status
+app.get('/api/health', async (req, res) => {
+    try {
+        const result = await db.get("SELECT 1 as val");
+        res.json({
+            status: 'ok',
+            db_provider: process.env.POSTGRES_URL ? 'PostgreSQL' : 'SQLite',
+            db_connected: !!result
+        });
+    } catch (err) {
+        res.status(500).json({ status: 'error', error: err.message });
+    }
+});
+
 // --- AUTHENTICATION ---
 
 app.post('/api/login', async (req, res) => {

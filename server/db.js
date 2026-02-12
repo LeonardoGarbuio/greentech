@@ -4,6 +4,9 @@ import postgresDb from './db-postgres.js';
 const isPostgres = !!process.env.POSTGRES_URL;
 
 console.log(`Database Provider: ${isPostgres ? 'PostgreSQL' : 'SQLite'}`);
+if (!isPostgres) {
+    console.warn("POSTGRES_URL environment variable is missing or empty.");
+}
 
 const db = isPostgres ? postgresDb : sqliteDb;
 
