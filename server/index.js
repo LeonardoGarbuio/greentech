@@ -119,31 +119,24 @@ app.get('/api/items', async (req, res) => {
 app.post('/api/items', async (req, res) => {
     const { type, title, description, weight_kg, lat, lng, address, producer_id } = req.body;
 
-    // We must ensure 'producer_id' is passed.
-    // And for Postgres, query text must use RETURNING id if we want lastID.
-    // Our db-postgres run wrapper tries to handle this by guessing or we can be explicit.
-    // For universal compatibility, explicitly asking for RETURNING id works in Postgres but FAILS in SQLite (syntax error).
-    // So we rely on db.run returning lastID (which our Postgres wrapper handles by looking at result).
-    // BUT our Postgres wrapper 'run' implementation only returns lastID if the query itself returned it?
-    // Wait, the PG wrapper I wrote checks `res.rows[0].id`.
-    // So the query must be `INSERT ... RETURNING id` for Postgres.
-    // But SQLite doesn't support `RETURNING id`.
-    // Solution: The db-postgres wrapper should Append `RETURNING id` to INSERT queries automatically?
-    // Or I make the query explicit and `db-sqlite` strips it?
-    // It's safer to just rely on `db.run` returning `lastID` via `this.lastID` (SQLite) 
-    // and manually implementing that in Postgres wrapper.
-    // In Postgres wrapper: `const res = await pool.query(text + ' RETURNING id', params)` if it's an insert.
-
-    // Let's modify the query here to be standard INSERT and assume `db.run` handles it.
+    if (!producer_id) return res.status(400).json({ error: 'Producer ID is required' });
 
     try {
+        // Use db.run which handles the INSERT and returns lastID/id
         const result = await db.run(`
             INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) 
             VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?)
         `, [producer_id, type, title, description, weight_kg, lat, lng, address]);
 
+        // If Postgres, result.lastID might be valid if our wrapper works, 
+        // but let's ensure we return the ID correctly. 
+        // Our db-postgres.js run function returns { lastID: res.rows[0].id } if RETURNING id is used/appended.
+
+        console.log("Item created, result:", result);
+
         res.json({ success: true, id: result.lastID });
     } catch (err) {
+        console.error("Error creating item:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -247,6 +240,28 @@ app.post('/api/addresses', async (req, res) => {
         } catch (err) { res.status(500).json({ error: err.message }); }
     } else {
         res.status(400).json({ error: 'Only producers' });
+    }
+});
+
+// --- NOTIFICATIONS ---
+app.get('/api/notifications', async (req, res) => {
+    const { userId, role } = req.query;
+    if (!userId || !role) return res.status(400).json({ error: 'Missing userId or role' });
+
+    try {
+        let rows = [];
+        if (role === 'producer') {
+            const result = await db.query("SELECT * FROM producer_notifications WHERE producer_id = ? ORDER BY created_at DESC", [userId]);
+            rows = result.rows;
+        } else {
+            // Collector notifications (if any table existed, currently none in schema/seed?)
+            // For now return empty or implement similar table if needed.
+            // Let's assume collectors don't have notifications table yet or use same logic
+            rows = [];
+        }
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
