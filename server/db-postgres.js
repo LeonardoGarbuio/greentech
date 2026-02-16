@@ -2,15 +2,17 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
 let pool;
 
-if (process.env.POSTGRES_URL) {
+if (connectionString) {
     pool = new Pool({
-        connectionString: process.env.POSTGRES_URL,
+        connectionString: connectionString,
     });
 } else {
     // Fallback or placeholder if env var missing but file imported
-    console.warn("POSTGRES_URL not found, PG pool will fail if used.");
+    console.warn("POSTGRES_URL/DATABASE_URL not found, PG pool will fail if used.");
 }
 
 // Convert '?' to '$1', '$2', etc.
