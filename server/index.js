@@ -10,14 +10,24 @@ app.use(express.json());
 
 // Health Check / DB Status
 app.get('/api/health', async (req, res) => {
+    const { init } = req.query;
+    console.log(`Health check requested (init=${init})`);
+
     try {
+        if (init === 'true' && process.env.POSTGRES_URL) {
+            console.log("Manual DB initialization triggered...");
+            await db.initDb(true);
+        }
+
         const result = await db.get("SELECT 1 as val");
         res.json({
             status: 'ok',
             db_provider: process.env.POSTGRES_URL ? 'PostgreSQL' : 'SQLite',
-            db_connected: !!result
+            db_connected: !!result,
+            time: new Date().toISOString()
         });
     } catch (err) {
+        console.error("Health check error:", err.message);
         res.status(500).json({ status: 'error', error: err.message });
     }
 });
@@ -26,6 +36,7 @@ app.get('/api/health', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
+    console.log(`Login attempt for email: ${email}`);
 
     try {
         // 1. Try finding in Producers

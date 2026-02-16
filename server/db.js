@@ -11,8 +11,10 @@ if (!isPostgres) {
 const db = isPostgres ? postgresDb : sqliteDb;
 
 // Initialize Postgres if needed (SQLite inits on load)
-if (isPostgres) {
-    postgresDb.initDb().catch(console.error);
-}
+// Removed automatic init on startup to avoid Vercel timeouts. 
+// Can be triggered manually via /api/health?init=true if needed.
+// if (isPostgres) {
+//     postgresDb.initDb().catch(console.error);
+// }
 
 export default db;

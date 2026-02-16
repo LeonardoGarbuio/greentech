@@ -59,9 +59,23 @@ export const run = async (text, params = []) => {
     };
 };
 
+let isInitializing = false;
+let isInitialized = false;
+
 // Initial Schema Creation for Postgres
-export const initDb = async () => {
+export const initDb = async (force = false) => {
     if (!pool) return;
+    if (isInitialized && !force) {
+        console.log("Postgres DB already initialized.");
+        return;
+    }
+    if (isInitializing) {
+        console.log("Postgres DB initialization already in progress...");
+        return;
+    }
+
+    isInitializing = true;
+    console.log("Starting Postgres DB initialization...");
 
     try {
         const client = await pool.connect();
@@ -174,6 +188,9 @@ export const initDb = async () => {
             // Seed Data
             await seedData(client);
 
+            isInitialized = true;
+            console.log("Postgres DB initialization completed successfully.");
+
         } catch (e) {
             await client.query('ROLLBACK');
             throw e;
@@ -182,6 +199,9 @@ export const initDb = async () => {
         }
     } catch (err) {
         console.error("Failed to init Postgres DB:", err);
+        throw err; // Re-throw to allow handler to report error
+    } finally {
+        isInitializing = false;
     }
 };
 
