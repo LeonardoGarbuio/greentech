@@ -119,24 +119,21 @@ app.get('/api/items', async (req, res) => {
 app.post('/api/items', async (req, res) => {
     const { type, title, description, weight_kg, lat, lng, address, producer_id } = req.body;
 
+    console.log("POST /api/items - body:", JSON.stringify(req.body));
+
     if (!producer_id) return res.status(400).json({ error: 'Producer ID is required' });
 
     try {
-        // Use db.run which handles the INSERT and returns lastID/id
         const result = await db.run(`
             INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) 
             VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?)
         `, [producer_id, type, title, description, weight_kg, lat, lng, address]);
 
-        // If Postgres, result.lastID might be valid if our wrapper works, 
-        // but let's ensure we return the ID correctly. 
-        // Our db-postgres.js run function returns { lastID: res.rows[0].id } if RETURNING id is used/appended.
-
-        console.log("Item created, result:", result);
+        console.log("Item created successfully, result:", JSON.stringify(result));
 
         res.json({ success: true, id: result.lastID });
     } catch (err) {
-        console.error("Error creating item:", err);
+        console.error("Error creating item:", err.message, err.stack);
         res.status(500).json({ error: err.message });
     }
 });
@@ -274,14 +271,24 @@ app.delete('/api/addresses/:id', async (req, res) => {
 });
 
 app.put('/api/user', async (req, res) => {
-    // ... code for update
     const { id, role, name, email, phone } = req.body;
+    console.log("PUT /api/user - body:", JSON.stringify(req.body));
+
+    if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
+
     const table = role === 'producer' ? 'producers' : 'collectors';
     try {
-        const result = await db.run(`UPDATE ${table} SET name = ?, email = ?, phone = ? WHERE id = ?`,
+        await db.run(`UPDATE ${table} SET name = ?, email = ?, phone = ? WHERE id = ?`,
             [name, email, phone, id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+
+        // Return the updated user data
+        const updatedUser = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        console.log("User updated successfully:", JSON.stringify(updatedUser));
+        res.json({ success: true, user: updatedUser });
+    } catch (err) {
+        console.error("Error updating user:", err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Allow Vercel to export app, but listen if run directly

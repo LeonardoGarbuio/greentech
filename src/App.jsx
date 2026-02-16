@@ -46,16 +46,21 @@ const App = () => {
     return () => clearInterval(intervalId);
   }, [userId, userRole, isLoggedIn]);
 
-  const handleAddItem = (newItem) => {
-    // Optimistic update - MUST include producer_id so we own it immediately!
-    const optimisticItem = { ...newItem, producer_id: userId, id: Date.now() }; // Temp ID
-    setFeedItems([optimisticItem, ...feedItems]);
+  const handleAddItem = async (newItem) => {
     setCurrentView('home');
 
-    // Send to backend
-    // Send to backend
-    api.createItem(newItem, userId)
-      .catch(err => console.error("Failed to post item:", err));
+    try {
+      // Send to backend first and get the real ID
+      const result = await api.createItem(newItem, userId);
+      console.log('Item created on backend:', result);
+
+      // Re-fetch all items from backend to get consistent state
+      const data = await api.getItems(userId, userRole);
+      setFeedItems(data);
+    } catch (err) {
+      console.error("Failed to post item:", err);
+      alert('Erro ao publicar item. Tente novamente.');
+    }
   };
 
   const handleAcceptItem = (id, newStatus = 'reserved') => {

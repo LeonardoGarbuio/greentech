@@ -57,11 +57,20 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
         };
 
         try {
-            await api.updateUser(updates);
-            setUser({ ...user, ...updates });
+            const result = await api.updateUser(updates);
+            console.log("Profile update result:", result);
+
+            if (result.success && result.user) {
+                setUser({ ...user, ...result.user });
+            } else {
+                setUser({ ...user, ...updates });
+            }
+
             setActiveModal(null);
+            alert('Perfil atualizado com sucesso!');
         } catch (error) {
             console.error("Failed to update profile:", error);
+            alert('Erro ao atualizar perfil. Tente novamente.');
         }
     };
 

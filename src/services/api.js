@@ -1,5 +1,5 @@
-const isProd = import.meta.env.PROD;
-export const API_BASE_URL = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:3002');
+// Always use /api — Vite proxy forwards to localhost:3002 in dev, Vercel rewrites handle prod
+export const API_BASE_URL = '/api';
 
 export const api = {
     // User endpoints
