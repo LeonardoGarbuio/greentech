@@ -1,5 +1,12 @@
 {
   "appId": "com.greentech.app",
   "appName": "GreenTech",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "allowNavigation": [
+      "10.0.2.2",
+      "localhost"
+    ]
+  }
 }

@@ -1,5 +1,26 @@
-// Always use /api — Vite proxy forwards to localhost:3002 in dev, Vercel rewrites handle prod
-export const API_BASE_URL = '/api';
+import { Capacitor } from '@capacitor/core';
+
+const isNative = Capacitor.isNativePlatform();
+const platform = Capacitor.getPlatform();
+
+/**
+ * API_BASE_URL - Configuração Inteligente:
+ * 1. Web/Navegador: Usa '/api' (Vite proxy no dev, Vercel no prod).
+ * 2. Android Emulator: Usa 'http://10.0.2.2:3002/api' para falar com o seu PC.
+ * 3. iOS Simulator: Usa 'http://localhost:3002/api' (iOS compartilha rede com Mac).
+ * 4. Dispositivo Real: Prefere '/api' se estiver em produção, ou o IP do PC se em dev.
+ */
+let baseUrl = '/api';
+
+if (isNative) {
+    if (platform === 'android') {
+        baseUrl = 'http://10.0.2.2:3002/api';
+    } else if (platform === 'ios') {
+        baseUrl = 'http://localhost:3002/api';
+    }
+}
+
+export const API_BASE_URL = baseUrl;
 
 export const api = {
     // User endpoints
