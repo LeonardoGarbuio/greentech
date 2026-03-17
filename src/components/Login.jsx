@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
-
 const Login = ({ onLogin }) => {
     const [isRegisterMode, setIsRegisterMode] = useState(false);
     const [name, setName] = useState('');
@@ -19,7 +18,7 @@ const Login = ({ onLogin }) => {
             try {
                 const data = await api.register(name, email, password, role);
                 if (data.success) {
-                    onLogin(email, password); // Execute login immediately after successful registration
+                    onLogin(email, password);
                 } else {
                     setError(data.message || 'Erro ao criar conta.');
                     setLoading(false);
@@ -31,7 +30,7 @@ const Login = ({ onLogin }) => {
             }
         } else {
             onLogin(email, password);
-            setLoading(false); // onLogin in App.jsx handles its own loading state implicitly but we'll reset here just in case it fails quickly
+            setLoading(false);
         }
     };
 
@@ -50,48 +49,47 @@ const Login = ({ onLogin }) => {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px',
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            padding: '24px',
+            background: 'linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%)',
             fontFamily: "'Outfit', sans-serif"
         }}>
             <div style={{
-                background: 'white',
-                padding: '40px',
-                borderRadius: '24px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '56px 32px',
+                borderRadius: '32px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
                 width: '100%',
-                maxWidth: '400px'
+                maxWidth: '440px',
+                backdropFilter: 'blur(10px)'
             }}>
-                <div style={{ textAlign: 'center', marginBottom: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{
-                        width: '80px',
-                        height: '80px',
-                        background: 'var(--primary-color)',
-                        borderRadius: '40px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '16px',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
-                    }}>
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                        </svg>
-                    </div>
-                    <h1 style={{ color: '#2c3e50', fontSize: '2rem', fontWeight: '800', marginBottom: '8px' }}>GreenTech</h1>
-                    <p style={{ color: '#7f8c8d' }}>Conexão solidária para o planeta</p>
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <h1 style={{ 
+                        color: '#102a43', 
+                        fontSize: '2.8rem', 
+                        fontWeight: '900', 
+                        letterSpacing: '-1.5px',
+                        marginBottom: '8px' 
+                    }}>GreenTech</h1>
+                    <p style={{ color: '#627d98', fontWeight: '500', fontSize: '1.1rem' }}>Conexão solidária para o planeta</p>
                 </div>
 
-                {/* Tabs */}
-                <div style={{ display: 'flex', marginBottom: '24px', borderRadius: '12px', background: '#f8f9fa', padding: '4px' }}>
+                {/* Modern Pill Tabs */}
+                <div style={{ 
+                    display: 'flex', 
+                    marginBottom: '32px', 
+                    borderRadius: '16px', 
+                    background: '#f0f4f8', 
+                    padding: '6px',
+                    position: 'relative'
+                }}>
                     <button 
                         onClick={() => { setIsRegisterMode(false); setError(''); }}
                         style={{
-                            flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                            flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
                             background: !isRegisterMode ? 'white' : 'transparent',
-                            boxShadow: !isRegisterMode ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                            color: !isRegisterMode ? 'var(--primary-color)' : '#95a5a6',
-                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s'
+                            boxShadow: !isRegisterMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                            color: !isRegisterMode ? '#27ae60' : '#829ab1',
+                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                         }}
                     >
                         Entrar
@@ -99,79 +97,96 @@ const Login = ({ onLogin }) => {
                     <button 
                         onClick={() => { setIsRegisterMode(true); setError(''); }}
                         style={{
-                            flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
+                            flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
                             background: isRegisterMode ? 'white' : 'transparent',
-                            boxShadow: isRegisterMode ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                            color: isRegisterMode ? 'var(--primary-color)' : '#95a5a6',
-                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.3s'
+                            boxShadow: isRegisterMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
+                            color: isRegisterMode ? '#27ae60' : '#829ab1',
+                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                         }}
                     >
                         Criar Conta
                     </button>
                 </div>
 
-                {error && <div style={{ color: '#e74c3c', textAlign: 'center', marginBottom: '16px', fontWeight: '600', fontSize: '0.9rem', padding: '10px', background: '#fdf0ed', borderRadius: '8px' }}>{error}</div>}
+                {error && <div style={{ 
+                    color: '#cb2b1d', textAlign: 'center', marginBottom: '24px', 
+                    fontWeight: '600', fontSize: '0.9rem', padding: '12px', 
+                    background: '#fff5f5', borderRadius: '12px', border: '1px solid #fee2e2' 
+                }}>{error}</div>}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {isRegisterMode && (
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '600' }}>Nome Completo</label>
+                        <div style={{ position: 'relative' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Nome Completo</label>
                             <input
                                 type="text"
                                 required
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 style={{
-                                    width: '100%', padding: '12px', borderRadius: '12px',
-                                    border: '1px solid #bdc3c7', outline: 'none', fontSize: '1rem'
+                                    width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
+                                    border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
+                                    background: '#f8fafc', transition: 'border-color 0.2s'
                                 }}
-                                placeholder="João Silva"
+                                placeholder="Como quer ser chamado?"
                             />
+                            <div style={{ position: 'absolute', left: '16px', top: '42px', color: '#9fb3c8' }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </div>
                         </div>
                     )}
                     
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '600' }}>Email</label>
+                    <div style={{ position: 'relative' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>E-mail</label>
                         <input
                             type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             style={{
-                                width: '100%', padding: '12px', borderRadius: '12px',
-                                border: '1px solid #bdc3c7', outline: 'none', fontSize: '1rem'
+                                width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
+                                border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
+                                background: '#f8fafc'
                             }}
-                            placeholder="seu@email.com"
+                            placeholder="seu@exemplo.com"
                         />
+                        <div style={{ position: 'absolute', left: '16px', top: '42px', color: '#9fb3c8' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </div>
                     </div>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '600' }}>Senha</label>
+
+                    <div style={{ position: 'relative' }}>
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Senha</label>
                         <input
                             type="password"
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             style={{
-                                width: '100%', padding: '12px', borderRadius: '12px',
-                                border: '1px solid #bdc3c7', outline: 'none', fontSize: '1rem'
+                                width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
+                                border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
+                                background: '#f8fafc'
                             }}
                             placeholder="••••••••"
                         />
+                        <div style={{ position: 'absolute', left: '16px', top: '42px', color: '#9fb3c8' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </div>
                     </div>
 
                     {isRegisterMode && (
                         <div>
-                            <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '600' }}>Qual é o seu perfil?</label>
-                            <div style={{ display: 'flex', gap: '10px' }}>
+                            <label style={{ display: 'block', marginBottom: '12px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Eu quero ser um...</label>
+                            <div style={{ display: 'flex', gap: '12px' }}>
                                 <button
                                     type="button"
                                     onClick={() => setRole('producer')}
                                     style={{
-                                        flex: 1, padding: '10px',
-                                        background: role === 'producer' ? '#e8f5e9' : '#f8f9fa',
-                                        color: role === 'producer' ? '#27ae60' : '#7f8c8d',
-                                        border: role === 'producer' ? '2px solid #27ae60' : '2px solid transparent',
-                                        borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+                                        flex: 1, padding: '14px',
+                                        background: role === 'producer' ? '#e8f5e9' : 'white',
+                                        color: role === 'producer' ? '#1b5e20' : '#627d98',
+                                        border: role === 'producer' ? '2px solid #27ae60' : '2px solid #d9e2ec',
+                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
                                     }}
                                 >
                                     🌱 Doador
@@ -180,46 +195,47 @@ const Login = ({ onLogin }) => {
                                     type="button"
                                     onClick={() => setRole('collector')}
                                     style={{
-                                        flex: 1, padding: '10px',
-                                        background: role === 'collector' ? '#fff3e0' : '#f8f9fa',
-                                        color: role === 'collector' ? '#e67e22' : '#7f8c8d',
-                                        border: role === 'collector' ? '2px solid #e67e22' : '2px solid transparent',
-                                        borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+                                        flex: 1, padding: '14px',
+                                        background: role === 'collector' ? '#fff3e0' : 'white',
+                                        color: role === 'collector' ? '#e65100' : '#627d98',
+                                        border: role === 'collector' ? '2px solid #f39c12' : '2px solid #d9e2ec',
+                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
                                     }}
                                 >
-                                    ♻️ Catador
+                                    🚛 Catador
                                 </button>
                             </div>
                         </div>
                     )}
 
                     <button type="submit" disabled={loading} style={{
-                        marginTop: '10px',
-                        padding: '14px',
-                        background: 'var(--primary-color)',
+                        marginTop: '12px',
+                        padding: '18px',
+                        background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '12px',
+                        borderRadius: '16px',
                         fontSize: '1.1rem',
-                        fontWeight: '700',
+                        fontWeight: '800',
                         cursor: loading ? 'not-allowed' : 'pointer',
-                        transition: 'background 0.2s',
-                        opacity: loading ? 0.7 : 1
+                        boxShadow: '0 8px 16px rgba(39, 174, 96, 0.2)',
+                        transition: 'all 0.3s'
                     }}>
-                        {loading ? 'Aguarde...' : (isRegisterMode ? 'Criar Conta' : 'Entrar')}
+                        {loading ? 'Processando...' : (isRegisterMode ? 'Criar Minha Conta' : 'Entrar na GreenTech')}
                     </button>
                 </form>
 
-                <div style={{ marginTop: '30px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                    <p style={{ textAlign: 'center', color: '#95a5a6', marginBottom: '15px', fontSize: '0.9rem' }}>Acesso Rápido (Teste)</p>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ marginTop: '40px', borderTop: '2px dashed #f0f4f8', paddingTop: '32px' }}>
+                    <p style={{ textAlign: 'center', color: '#bcccdc', marginBottom: '20px', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Acesso de Demonstração</p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
                         <button
                             type="button"
                             onClick={() => handleQuickLogin('producer')}
                             style={{
-                                flex: 1, padding: '8px', background: 'transparent',
-                                color: '#27ae60', border: '1px solid #27ae60', borderRadius: '8px',
-                                fontWeight: '600', cursor: 'pointer'
+                                flex: 1, padding: '12px', background: 'white',
+                                color: '#27ae60', border: '1px solid #d9e2ec', borderRadius: '12px',
+                                fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                fontSize: '0.9rem'
                             }}
                         >
                             Doador
@@ -228,9 +244,10 @@ const Login = ({ onLogin }) => {
                             type="button"
                             onClick={() => handleQuickLogin('collector')}
                             style={{
-                                flex: 1, padding: '8px', background: 'transparent',
-                                color: '#e67e22', border: '1px solid #e67e22', borderRadius: '8px',
-                                fontWeight: '600', cursor: 'pointer'
+                                flex: 1, padding: '12px', background: 'white',
+                                color: '#f39c12', border: '1px solid #d9e2ec', borderRadius: '12px',
+                                fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                fontSize: '0.9rem'
                             }}
                         >
                             Catador
