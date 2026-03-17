@@ -191,7 +191,7 @@ const Login = ({ onLogin }) => {
                         width: '100%',
                         boxSizing: 'border-box'
                     }}>
-                        {loading ? 'Processando...' : (isRegisterMode ? 'Criar Minha Conta' : 'Entrar na GreenTech')}
+                        {loading ? 'Processando...' : (isRegisterMode ? 'Criar Minha Conta' : 'Entrar')}
                     </button>
                     
                     {/* Toggle Mode Link (Substituindo as abas anteriores) */}
