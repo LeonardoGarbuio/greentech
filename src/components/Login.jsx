@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
+
 const Login = ({ onLogin }) => {
     const [isRegisterMode, setIsRegisterMode] = useState(false);
     const [name, setName] = useState('');
@@ -55,14 +56,14 @@ const Login = ({ onLogin }) => {
         }}>
             <div style={{
                 background: 'rgba(255, 255, 255, 0.95)',
-                padding: '56px 32px',
+                padding: '56px 32px 40px 32px',
                 borderRadius: '32px',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
                 width: '100%',
                 maxWidth: '440px',
                 backdropFilter: 'blur(10px)'
             }}>
-                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <h1 style={{ 
                         color: '#102a43', 
                         fontSize: '2.8rem', 
@@ -73,41 +74,6 @@ const Login = ({ onLogin }) => {
                     <p style={{ color: '#627d98', fontWeight: '500', fontSize: '1.1rem' }}>Conexão solidária para o planeta</p>
                 </div>
 
-                {/* Modern Pill Tabs */}
-                <div style={{ 
-                    display: 'flex', 
-                    marginBottom: '32px', 
-                    borderRadius: '16px', 
-                    background: '#f0f4f8', 
-                    padding: '6px',
-                    position: 'relative'
-                }}>
-                    <button 
-                        onClick={() => { setIsRegisterMode(false); setError(''); }}
-                        style={{
-                            flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
-                            background: !isRegisterMode ? 'white' : 'transparent',
-                            boxShadow: !isRegisterMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                            color: !isRegisterMode ? '#27ae60' : '#829ab1',
-                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                        }}
-                    >
-                        Entrar
-                    </button>
-                    <button 
-                        onClick={() => { setIsRegisterMode(true); setError(''); }}
-                        style={{
-                            flex: 1, padding: '12px', border: 'none', borderRadius: '12px',
-                            background: isRegisterMode ? 'white' : 'transparent',
-                            boxShadow: isRegisterMode ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                            color: isRegisterMode ? '#27ae60' : '#829ab1',
-                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                        }}
-                    >
-                        Criar Conta
-                    </button>
-                </div>
-
                 {error && <div style={{ 
                     color: '#cb2b1d', textAlign: 'center', marginBottom: '24px', 
                     fontWeight: '600', fontSize: '0.9rem', padding: '12px', 
@@ -116,7 +82,7 @@ const Login = ({ onLogin }) => {
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {isRegisterMode && (
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'relative', animation: 'fadeIn 0.3s ease-in-out' }}>
                             <label style={{ display: 'block', marginBottom: '8px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Nome Completo</label>
                             <input
                                 type="text"
@@ -126,7 +92,7 @@ const Login = ({ onLogin }) => {
                                 style={{
                                     width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
                                     border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
-                                    background: '#f8fafc', transition: 'border-color 0.2s'
+                                    background: '#f8fafc', transition: 'border-color 0.2s', boxSizing: 'border-box'
                                 }}
                                 placeholder="Como quer ser chamado?"
                             />
@@ -146,7 +112,7 @@ const Login = ({ onLogin }) => {
                             style={{
                                 width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
                                 border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
-                                background: '#f8fafc'
+                                background: '#f8fafc', boxSizing: 'border-box'
                             }}
                             placeholder="seu@exemplo.com"
                         />
@@ -165,7 +131,7 @@ const Login = ({ onLogin }) => {
                             style={{
                                 width: '100%', padding: '16px 16px 16px 48px', borderRadius: '16px',
                                 border: '1px solid #d9e2ec', outline: 'none', fontSize: '1rem',
-                                background: '#f8fafc'
+                                background: '#f8fafc', boxSizing: 'border-box'
                             }}
                             placeholder="••••••••"
                         />
@@ -175,7 +141,7 @@ const Login = ({ onLogin }) => {
                     </div>
 
                     {isRegisterMode && (
-                        <div>
+                        <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
                             <label style={{ display: 'block', marginBottom: '12px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Eu quero ser um...</label>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button
@@ -186,7 +152,8 @@ const Login = ({ onLogin }) => {
                                         background: role === 'producer' ? '#e8f5e9' : 'white',
                                         color: role === 'producer' ? '#1b5e20' : '#627d98',
                                         border: role === 'producer' ? '2px solid #27ae60' : '2px solid #d9e2ec',
-                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
+                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                        boxSizing: 'border-box'
                                     }}
                                 >
                                     🌱 Doador
@@ -199,7 +166,8 @@ const Login = ({ onLogin }) => {
                                         background: role === 'collector' ? '#fff3e0' : 'white',
                                         color: role === 'collector' ? '#e65100' : '#627d98',
                                         border: role === 'collector' ? '2px solid #f39c12' : '2px solid #d9e2ec',
-                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s'
+                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                        boxSizing: 'border-box'
                                     }}
                                 >
                                     🚛 Catador
@@ -215,18 +183,39 @@ const Login = ({ onLogin }) => {
                         color: 'white',
                         border: 'none',
                         borderRadius: '16px',
-                        fontSize: '1.1rem',
+                        fontSize: '1.2rem',
                         fontWeight: '800',
                         cursor: loading ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 8px 16px rgba(39, 174, 96, 0.2)',
-                        transition: 'all 0.3s'
+                        boxShadow: '0 8px 16px rgba(39, 174, 96, 0.25)',
+                        transition: 'all 0.3s',
+                        width: '100%',
+                        boxSizing: 'border-box'
                     }}>
                         {loading ? 'Processando...' : (isRegisterMode ? 'Criar Minha Conta' : 'Entrar na GreenTech')}
                     </button>
+                    
+                    {/* Toggle Mode Link (Substituindo as abas anteriores) */}
+                    <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                        <span style={{ color: '#627d98', fontSize: '0.95rem', fontWeight: '500' }}>
+                            {isRegisterMode ? 'Já tem uma conta? ' : 'Ainda não faz parte? '}
+                        </span>
+                        <button 
+                            type="button" 
+                            onClick={() => { setIsRegisterMode(!isRegisterMode); setError(''); }}
+                            style={{ 
+                                background: 'transparent', border: 'none', 
+                                color: '#27ae60', fontWeight: '800', fontSize: '0.95rem',
+                                cursor: 'pointer', padding: '0 0 0 4px',
+                                textDecoration: 'underline', textUnderlineOffset: '4px'
+                            }}
+                        >
+                            {isRegisterMode ? 'Fazer Login' : 'Criar Conta'}
+                        </button>
+                    </div>
                 </form>
 
-                <div style={{ marginTop: '40px', borderTop: '2px dashed #f0f4f8', paddingTop: '32px' }}>
-                    <p style={{ textAlign: 'center', color: '#bcccdc', marginBottom: '20px', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Acesso de Demonstração</p>
+                <div style={{ marginTop: '40px', borderTop: '2px dashed #e4e9f2', paddingTop: '32px' }}>
+                    <p style={{ textAlign: 'center', color: '#9fb3c8', marginBottom: '20px', fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>Acesso de Demonstração</p>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button
                             type="button"
@@ -235,10 +224,10 @@ const Login = ({ onLogin }) => {
                                 flex: 1, padding: '12px', background: 'white',
                                 color: '#27ae60', border: '1px solid #d9e2ec', borderRadius: '12px',
                                 fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
-                                fontSize: '0.9rem'
+                                fontSize: '0.9rem', boxSizing: 'border-box'
                             }}
                         >
-                            Doador
+                            Modo Doador
                         </button>
                         <button
                             type="button"
@@ -247,10 +236,10 @@ const Login = ({ onLogin }) => {
                                 flex: 1, padding: '12px', background: 'white',
                                 color: '#f39c12', border: '1px solid #d9e2ec', borderRadius: '12px',
                                 fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
-                                fontSize: '0.9rem'
+                                fontSize: '0.9rem', boxSizing: 'border-box'
                             }}
                         >
-                            Catador
+                            Modo Catador
                         </button>
                     </div>
                 </div>
