@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Geolocation } from '@capacitor/geolocation';
 
 const PostItem = ({ onBack, onAddItem }) => {
     const [type, setType] = useState('paper');
@@ -17,28 +18,39 @@ const PostItem = ({ onBack, onAddItem }) => {
         }
     };
 
-    const handleGetLocation = () => {
+    const handleGetLocation = async () => {
         setLocationStatus('loading');
-        if (!navigator.geolocation) {
-            setLocationStatus('error');
-            alert('Geolocalização não suportada pelo seu navegador.');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setCoords({
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                });
-                setLocationStatus('success');
-            },
-            (error) => {
-                console.error("Error getting location:", error);
-                setLocationStatus('error');
-                alert('Erro ao obter localização. Verifique as permissões.');
+        
+        try {
+            // Check and Request Permissions natively
+            const permissions = await Geolocation.checkPermissions();
+            
+            if (permissions.location !== 'granted') {
+                const request = await Geolocation.requestPermissions();
+                if (request.location !== 'granted') {
+                    setLocationStatus('error');
+                    alert('Permissão de localização foi negada. Por favor, ative nas configurações do seu celular ou navegador.');
+                    return;
+                }
             }
-        );
+
+            // Fetch accurate position
+            const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000
+            });
+
+            setCoords({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            });
+            setLocationStatus('success');
+
+        } catch (error) {
+            console.error("Error getting location:", error);
+            setLocationStatus('error');
+            alert('Erro ao obter a localização atual. Verifique se o GPS está ligado.');
+        }
     };
 
     const handleSubmit = (e) => {
