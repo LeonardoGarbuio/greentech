@@ -1,12 +1,29 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import db from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const JWT_SECRET = process.env.JWT_SECRET || 'greentech-super-secret-key-2024';
 
 app.use(cors());
 app.use(express.json());
+
+// --- MIDDLEWARE ---
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: 'Acesso negado. Token não fornecido.' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Token inválido ou expirado.' });
+        req.user = user;
+        next();
+    });
+};
 
 // Health Check / DB Status
 app.get('/api/health', async (req, res) => {
@@ -43,11 +60,20 @@ app.post('/api/login', async (req, res) => {
         const producer = await db.get("SELECT * FROM producers WHERE email = ?", [email]);
 
         if (producer) {
-            if (producer.password !== password) {
+            // Handle both legacy plain-text and new bcrypt hashes for smooth transition
+            const isMatch = producer.password.startsWith('$2') 
+                ? await bcrypt.compare(password, producer.password)
+                : producer.password === password;
+
+            if (!isMatch) {
                 return res.status(401).json({ success: false, message: 'Senha incorreta' });
             }
+            
+            const token = jwt.sign({ id: producer.id, role: 'producer' }, JWT_SECRET, { expiresIn: '7d' });
+            
             return res.json({
                 success: true,
+                token,
                 user: {
                     id: producer.id,
                     name: producer.name,
@@ -63,11 +89,19 @@ app.post('/api/login', async (req, res) => {
         const collector = await db.get("SELECT * FROM collectors WHERE email = ?", [email]);
 
         if (collector) {
-            if (collector.password !== password) {
+            const isMatch = collector.password.startsWith('$2') 
+                ? await bcrypt.compare(password, collector.password)
+                : collector.password === password;
+
+            if (!isMatch) {
                 return res.status(401).json({ success: false, message: 'Senha incorreta' });
             }
+
+            const token = jwt.sign({ id: collector.id, role: 'collector' }, JWT_SECRET, { expiresIn: '7d' });
+
             return res.json({
                 success: true,
+                token,
                 user: {
                     id: collector.id,
                     name: collector.name,
@@ -85,7 +119,6 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 app.post('/api/register', async (req, res) => {
     const { name, email, password, role } = req.body;
     console.log(`Register attempt for email: ${email}, role: ${role}`);
@@ -105,12 +138,16 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Este e-mail já está cadastrado.' });
         }
 
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         // Insert new user
         let newUserId;
         if (role === 'producer') {
             const result = await db.run(
                 "INSERT INTO producers (name, email, password) VALUES (?, ?, ?)",
-                [name, email, password]
+                [name, email, hashedPassword]
             );
             newUserId = result.lastID;
 
@@ -123,7 +160,7 @@ app.post('/api/register', async (req, res) => {
         } else {
             const result = await db.run(
                 "INSERT INTO collectors (name, email, password, vehicle_type) VALUES (?, ?, ?, ?)",
-                [name, email, password, 'Outro'] // Default vehicle type
+                [name, email, hashedPassword, 'Outro'] // Default vehicle type
             );
             newUserId = result.lastID;
         }
@@ -131,21 +168,24 @@ app.post('/api/register', async (req, res) => {
         // Return the user directly so they can be logged in automatically on the frontend
         const newUser = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [newUserId]);
         
+        const token = jwt.sign({ id: newUser.id, role: role }, JWT_SECRET, { expiresIn: '7d' });
+        
         return res.json({
             success: true,
+            token,
             user: {
                 id: newUser.id,
                 name: newUser.name,
                 email: newUser.email,
                 role: role,
-                ...(role === 'producer' ? { points: newUser.points || 0 } : { earnings: newUser.earnings || 0 }),
-                avatar_url: newUser.avatar_url
+                avatar_url: newUser.avatar_url,
+                points: newUser.points || 0,
+                earnings: newUser.earnings || 0
             }
         });
-        
     } catch (err) {
-        console.error("Register error:", err.message);
-        res.status(500).json({ error: 'Erro ao cadastrar usuário' });
+        console.error("Register error:", err);
+        res.status(500).json({ success: false, message: 'Erro interno no servidor.' });
     }
 });
 
@@ -197,7 +237,7 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
-app.post('/api/items', async (req, res) => {
+app.post('/api/items', authenticateToken, async (req, res) => {
     const { type, title, description, weight_kg, lat, lng, address, producer_id } = req.body;
 
     console.log("POST /api/items - body:", JSON.stringify(req.body));
@@ -219,7 +259,7 @@ app.post('/api/items', async (req, res) => {
     }
 });
 
-app.delete('/api/items/:id', async (req, res) => {
+app.delete('/api/items/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         const result = await db.run("DELETE FROM items WHERE id = ?", [id]);
@@ -229,7 +269,7 @@ app.delete('/api/items/:id', async (req, res) => {
     }
 }); // Fixed missing brace here
 
-app.put('/api/items/:id/status', async (req, res) => {
+app.put('/api/items/:id/status', authenticateToken, async (req, res) => {
     const { status, collector_id } = req.body;
     const { id } = req.params;
 

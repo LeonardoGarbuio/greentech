@@ -22,6 +22,15 @@ if (isNative) {
 
 export const API_BASE_URL = baseUrl;
 
+// Helper function to include the JWT token in headers
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('greentech_token');
+    return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+};
+
 export const api = {
     // User endpoints
     login: async (email, password) => {
@@ -30,7 +39,9 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
-        return response.json();
+        const data = await response.json();
+        if (data.token) localStorage.setItem('greentech_token', data.token);
+        return data;
     },
 
     register: async (name, email, password, role) => {
@@ -39,7 +50,9 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, email, password, role })
         });
-        return response.json();
+        const data = await response.json();
+        if (data.token) localStorage.setItem('greentech_token', data.token);
+        return data;
     },
 
     getUserStats: async (userId, role) => {
@@ -69,7 +82,7 @@ export const api = {
     createItem: async (item, producerId) => {
         const response = await fetch(`${API_BASE_URL}/items`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ ...item, producer_id: producerId })
         });
         return response.json();
@@ -78,7 +91,7 @@ export const api = {
     updateItemStatus: async (itemId, status, collectorId) => {
         const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ status, collector_id: collectorId })
         });
         return response.json();
@@ -87,6 +100,7 @@ export const api = {
     deleteItem: async (itemId) => {
         const response = await fetch(`${API_BASE_URL}/items/${itemId}`, {
             method: 'DELETE',
+            headers: getAuthHeaders(),
         });
         return response.json(); // May be empty or status only
     },
