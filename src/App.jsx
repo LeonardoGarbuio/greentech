@@ -164,7 +164,7 @@ const App = () => {
   };
 
   return (
-    <>
+    <div className="app-shell">
       {renderScreen()}
 
       {/* Persistent Bottom Navigation (except on Post Item) */}
@@ -175,7 +175,7 @@ const App = () => {
           userRole={userRole}
         />
       )}
-    </>
+    </div>
   )
 }
 

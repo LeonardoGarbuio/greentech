@@ -190,6 +190,34 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                         <button className="btn-primary" style={{ marginTop: '10px' }}>Falar com Suporte</button>
                     </div>
                 );
+            case 'privacy':
+                return (
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                        <h4 style={{ color: 'var(--text-primary)', marginBottom: '10px' }}>Política de Privacidade GreenTech</h4>
+                        <p>A GreenTech valoriza a sua privacidade. Coletamos apenas os dados necessários para realizar a conexão entre produtores de recicláveis e coletores:</p>
+                        <ul style={{ paddingLeft: '20px', margin: '10px 0' }}>
+                            <li>Dados de Perfil: Nome, e-mail e telefone para identificação.</li>
+                            <li>Localização: Fornecida por você para indicar pontos de coleta.</li>
+                            <li>Histórico: Registros de coletas realizadas no app.</li>
+                        </ul>
+                        <p>Seus dados nunca são vendidos a terceiros e são usados exclusivamente para a operação da plataforma Greentech.</p>
+                        <p style={{ marginTop: '10px' }}>Para excluir seus dados permanentemente, use o botão "Excluir Conta" nas configurações do perfil.</p>
+                    </div>
+                );
+            case 'delete_account':
+                return (
+                    <div style={{ textAlign: 'center', padding: '10px' }}>
+                        <div style={{ color: '#e74c3c', fontSize: '3rem', marginBottom: '16px' }}>⚠️</div>
+                        <h3 style={{ marginBottom: '12px' }}>Tem certeza absoluta?</h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                            Ao excluir sua conta, todos os seus dados, histórico de coletas e pontos serão removidos permanentemente. Esta ação não pode ser desfeita.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button onClick={() => setActiveModal(null)} className="btn-primary" style={{ background: '#eee', color: '#333' }}>Manter Conta</button>
+                            <button onClick={() => { alert('Conta excluída. (Simulação)'); onLogout(); }} className="btn-primary" style={{ background: '#e74c3c' }}>Excluir Agora</button>
+                        </div>
+                    </div>
+                );
             default:
                 return null;
         }
@@ -201,6 +229,8 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
             case 'notifications': return 'Notificações';
             case 'addresses': return 'Meus Endereços';
             case 'help': return 'Ajuda & Suporte';
+            case 'privacy': return 'Política de Privacidade';
+            case 'delete_account': return 'Aviso de Segurança';
             default: return '';
         }
     };
@@ -283,19 +313,22 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                         { id: 'edit', label: 'Editar Perfil' },
                         { id: 'notifications', label: 'Notificações' },
                         { id: 'addresses', label: 'Meus Endereços' },
-                        { id: 'help', label: 'Ajuda' }
+                        { id: 'help', label: 'Ajuda' },
+                        { id: 'privacy', label: 'Política de Privacidade' },
+                        { id: 'delete_account', label: 'Excluir Minha Conta', style: { color: '#e74c3c' } }
                     ].map((item, index) => (
                         <div
                             key={item.id}
                             onClick={() => setActiveModal(item.id)}
                             style={{
                                 padding: '16px 20px',
-                                borderBottom: index < 3 ? '1px solid var(--surface-border)' : 'none',
+                                borderBottom: index < 5 ? '1px solid var(--surface-border)' : 'none',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 cursor: 'pointer',
-                                transition: 'background 0.2s'
+                                transition: 'background 0.2s',
+                                ...item.style
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f8f9fa'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}

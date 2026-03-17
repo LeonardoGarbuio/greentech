@@ -40,9 +40,12 @@ app.post('/api/login', async (req, res) => {
 
     try {
         // 1. Try finding in Producers
-        const producer = await db.get("SELECT * FROM producers WHERE email = ? AND password = ?", [email, password]);
+        const producer = await db.get("SELECT * FROM producers WHERE email = ?", [email]);
 
         if (producer) {
+            if (producer.password !== password) {
+                return res.status(401).json({ success: false, message: 'Senha incorreta' });
+            }
             return res.json({
                 success: true,
                 user: {
@@ -57,9 +60,12 @@ app.post('/api/login', async (req, res) => {
         }
 
         // 2. Try finding in Collectors
-        const collector = await db.get("SELECT * FROM collectors WHERE email = ? AND password = ?", [email, password]);
+        const collector = await db.get("SELECT * FROM collectors WHERE email = ?", [email]);
 
         if (collector) {
+            if (collector.password !== password) {
+                return res.status(401).json({ success: false, message: 'Senha incorreta' });
+            }
             return res.json({
                 success: true,
                 user: {
@@ -74,11 +80,75 @@ app.post('/api/login', async (req, res) => {
         }
 
         // 3. Not found
-        res.status(401).json({ success: false, message: 'Credenciais inválidas' });
+        res.status(404).json({ success: false, message: 'Usuário não encontrado' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+app.post('/api/register', async (req, res) => {
+    const { name, email, password, role } = req.body;
+    console.log(`Register attempt for email: ${email}, role: ${role}`);
+
+    if (!name || !email || !password || !role) {
+        return res.status(400).json({ success: false, message: 'Preencha todos os campos obrigatórios.' });
+    }
+
+    const table = role === 'producer' ? 'producers' : 'collectors';
+
+    try {
+        // Check if email already exists in either table
+        const producerExists = await db.get("SELECT id FROM producers WHERE email = ?", [email]);
+        const collectorExists = await db.get("SELECT id FROM collectors WHERE email = ?", [email]);
+
+        if (producerExists || collectorExists) {
+            return res.status(400).json({ success: false, message: 'Este e-mail já está cadastrado.' });
+        }
+
+        // Insert new user
+        let newUserId;
+        if (role === 'producer') {
+            const result = await db.run(
+                "INSERT INTO producers (name, email, password) VALUES (?, ?, ?)",
+                [name, email, password]
+            );
+            newUserId = result.lastID;
+
+            // Welcome notification
+            await db.run(
+                "INSERT INTO producer_notifications (producer_id, title, message, type) VALUES (?, ?, ?, ?)",
+                [newUserId, 'Bem-vindo!', 'Sua conta de Doador foi criada com sucesso.', 'system']
+            );
+
+        } else {
+            const result = await db.run(
+                "INSERT INTO collectors (name, email, password, vehicle_type) VALUES (?, ?, ?, ?)",
+                [name, email, password, 'Outro'] // Default vehicle type
+            );
+            newUserId = result.lastID;
+        }
+
+        // Return the user directly so they can be logged in automatically on the frontend
+        const newUser = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [newUserId]);
+        
+        return res.json({
+            success: true,
+            user: {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+                role: role,
+                ...(role === 'producer' ? { points: newUser.points || 0 } : { earnings: newUser.earnings || 0 }),
+                avatar_url: newUser.avatar_url
+            }
+        });
+        
+    } catch (err) {
+        console.error("Register error:", err.message);
+        res.status(500).json({ error: 'Erro ao cadastrar usuário' });
+    }
+});
+
 
 // --- USER DATA ---
 

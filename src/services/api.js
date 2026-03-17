@@ -10,13 +10,13 @@ const platform = Capacitor.getPlatform();
  * 3. iOS Simulator: Usa 'http://localhost:3002/api' (iOS compartilha rede com Mac).
  * 4. Dispositivo Real: Prefere '/api' se estiver em produção, ou o IP do PC se em dev.
  */
-let baseUrl = '/api';
+let baseUrl = import.meta.env.VITE_API_URL || '/api';
 
 if (isNative) {
     if (platform === 'android') {
-        baseUrl = 'http://10.0.2.2:3002/api';
+        baseUrl = import.meta.env.VITE_API_URL || 'http://10.0.2.2:3002/api';
     } else if (platform === 'ios') {
-        baseUrl = 'http://localhost:3002/api';
+        baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
     }
 }
 
@@ -29,6 +29,15 @@ export const api = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
+        });
+        return response.json();
+    },
+
+    register: async (name, email, password, role) => {
+        const response = await fetch(`${API_BASE_URL}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password, role })
         });
         return response.json();
     },

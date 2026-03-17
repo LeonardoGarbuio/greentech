@@ -110,6 +110,37 @@ button:active {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+/* Responsiveness: Global Container for Desktop/Tablet */
+.app-shell {
+  max-width: 500px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  background-color: var(--surface-color);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 768px) {
+  body {
+    background-color: #e2e8f0;
+    /* Slightly darker bg for desktop to contrast the phone shell */
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 480px;
+    /* Standard phone-like width on large screens */
+    margin-top: 20px;
+    margin-bottom: 20px;
+    height: calc(100dvh - 40px);
+    border-radius: 32px;
+    border: 8px solid #333;
+    /* Visual frame */
+    overflow: hidden;
+  }
+}
+
 /* Hide scrollbar for horizontal lists */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
