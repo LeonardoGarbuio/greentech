@@ -120,7 +120,11 @@ const App = () => {
   };
 
   if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <div className="app-shell">
+        <Login onLogin={handleLogin} />
+      </div>
+    );
   }
 
   const user = { id: userId, role: userRole };

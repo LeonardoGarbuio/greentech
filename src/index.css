@@ -32,6 +32,10 @@
   /* Softer, friendlier corners */
   --radius-lg: 24px;
   /* Very round for cards */
+
+  /* Safe Area Insets for Mobile (Android/iOS) */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -48,6 +52,8 @@ body {
   min-height: 100dvh;
   /* Mobile viewport fix */
   overflow-x: hidden;
+  padding-top: var(--safe-area-top);
+  padding-bottom: var(--safe-area-bottom);
 }
 
 button {

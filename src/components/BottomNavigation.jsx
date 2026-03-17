@@ -27,7 +27,7 @@ const BottomNavigation = ({ currentView, onNavigate, userRole }) => {
     return (
         <div style={{
             position: 'fixed',
-            bottom: '20px', // Floating
+            bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))', // Floating securely above gesture bars
             left: '20px',
             right: '20px',
             width: 'auto', // Auto width to respect margins
