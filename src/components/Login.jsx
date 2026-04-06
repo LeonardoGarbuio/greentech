@@ -10,6 +10,7 @@ const Login = ({ onLogin, onGoogleLogin }) => {
     const [role, setRole] = useState('producer');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -45,24 +46,43 @@ const Login = ({ onLogin, onGoogleLogin }) => {
         }
     };
 
+    const callBackendAuth = async (googleData, selectedRole = null) => {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: googleData.name,
+                email: googleData.email,
+                photoUrl: googleData.photoUrl,
+                ...(selectedRole ? { role: selectedRole, isCreate: true } : { isCreate: false })
+            })
+        });
+        return await response.json();
+    };
+
     const handleGoogleLogin = async () => {
         setError('');
         setLoading(true);
         try {
             const googleUser = await signInWithGoogle();
-            // Enviar para nosso backend criar/buscar usuário
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/google`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            const data = await callBackendAuth({
+                name: googleUser.name,
+                email: googleUser.email,
+                photoUrl: googleUser.photoUrl
+            });
+            
+            if (data.requiresRole) {
+                setPendingGoogleUser({
                     name: googleUser.name,
                     email: googleUser.email,
-                    photoUrl: googleUser.photoUrl,
-                    role: 'producer' // padrão para Google login
-                })
-            });
-            const data = await response.json();
+                    photoUrl: googleUser.photoUrl
+                });
+                setLoading(false);
+                return;
+            }
+
             if (data.success) {
+                if (data.token) localStorage.setItem('greentech_token', data.token);
                 onGoogleLogin(data.user);
             } else {
                 setError(data.message || 'Erro ao fazer login com Google.');
@@ -73,6 +93,54 @@ const Login = ({ onLogin, onGoogleLogin }) => {
         }
         setLoading(false);
     };
+
+    const handleGoogleRoleSelection = async (selectedRole) => {
+        setError('');
+        setLoading(true);
+        try {
+            const data = await callBackendAuth(pendingGoogleUser, selectedRole);
+            if (data.success) {
+                if (data.token) localStorage.setItem('greentech_token', data.token);
+                setPendingGoogleUser(null);
+                onGoogleLogin(data.user);
+            } else {
+                setError(data.message || 'Erro na criação da conta.');
+            }
+        } catch (err) {
+            setError('Erro ao concluir cadastro Google.');
+        }
+        setLoading(false);
+    };
+
+    if (pendingGoogleUser) {
+        return (
+            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%)', fontFamily: "'Outfit', sans-serif" }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '56px 32px 40px 32px', borderRadius: '32px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', width: '100%', maxWidth: '440px', textAlign: 'center' }}>
+                    <h2 style={{ color: '#102a43', fontSize: '2rem', fontWeight: '900', marginBottom: '16px' }}>Último Passo!</h2>
+                    <p style={{ color: '#627d98', marginBottom: '32px', fontSize: '1.1rem' }}>Como você quer usar o GreenTech?</p>
+                    
+                    {error && <div style={{ color: '#cb2b1d', padding: '12px', background: '#fff5f5', borderRadius: '12px', border: '1px solid #fee2e2', marginBottom: '24px' }}>{error}</div>}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <button
+                            onClick={() => handleGoogleRoleSelection('producer')}
+                            disabled={loading}
+                            style={{ padding: '20px', background: '#e8f5e9', color: '#1b5e20', border: '2px solid #27ae60', borderRadius: '16px', fontWeight: '800', fontSize: '1.1rem', cursor: loading ? 'not-allowed' : 'pointer' }}
+                        >
+                            🌱 Sou um Doador
+                        </button>
+                        <button
+                            onClick={() => handleGoogleRoleSelection('collector')}
+                            disabled={loading}
+                            style={{ padding: '20px', background: '#fff3e0', color: '#e65100', border: '2px solid #f39c12', borderRadius: '16px', fontWeight: '800', fontSize: '1.1rem', cursor: loading ? 'not-allowed' : 'pointer' }}
+                        >
+                            🚛 Sou um Catador
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{

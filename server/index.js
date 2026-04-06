@@ -193,7 +193,7 @@ app.post('/api/register', async (req, res) => {
 });
 // --- GOOGLE AUTH ---
 app.post('/api/auth/google', async (req, res) => {
-    const { name, email, photoUrl, role } = req.body;
+    const { name, email, photoUrl, role, isCreate } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email obrigatório' });
 
     try {
@@ -237,7 +237,11 @@ app.post('/api/auth/google', async (req, res) => {
             });
         }
 
-        // Não existe → criar novo como producer (padrão)
+        // Não existe → se não for explicitamente uma criação com papel escolhido, pedir papel
+        if (!isCreate) {
+            return res.json({ success: true, requiresRole: true });
+        }
+
         const userRole = role || 'producer';
         const table = userRole === 'collector' ? 'collectors' : 'producers';
         const randomPassword = Math.random().toString(36).slice(-8);
