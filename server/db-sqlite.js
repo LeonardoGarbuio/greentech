@@ -35,7 +35,8 @@ function initDb(db) {
             points INTEGER DEFAULT 0,
             weight_recycled REAL DEFAULT 0,
             level TEXT DEFAULT 'Iniciante',
-            avatar_url TEXT
+            avatar_url TEXT,
+            onboarding_completed INTEGER DEFAULT 0
         )`);
 
         db.run(`CREATE TABLE IF NOT EXISTS producer_notifications (
@@ -71,8 +72,13 @@ function initDb(db) {
             collections_count INTEGER DEFAULT 0,
             vehicle_type TEXT,
             rating REAL DEFAULT 5.0,
-            avatar_url TEXT
+            avatar_url TEXT,
+            onboarding_completed INTEGER DEFAULT 0
         )`);
+
+        // Migração: adicionar coluna se tabela já existir
+        db.run(`ALTER TABLE producers ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
+        db.run(`ALTER TABLE collectors ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
 
         db.run(`CREATE TABLE IF NOT EXISTS collector_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

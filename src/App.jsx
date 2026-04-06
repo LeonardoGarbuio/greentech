@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Login from './components/Login';
+import Onboarding from './components/Onboarding';
 import Home from './components/Home';
 import CollectorHome from './components/CollectorHome';
 import Dashboard from './components/Dashboard';
@@ -16,10 +17,39 @@ import { api } from './services/api';
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState('producer'); // 'producer' or 'collector'
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userRole, setUserRole] = useState('producer');
   const [userId, setUserId] = useState(null);
-  const [currentView, setCurrentView] = useState('home'); // Default to home
+  const [currentView, setCurrentView] = useState('home');
   const [feedItems, setFeedItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Restaurar sessão de VERDADE via banco de dados
+  React.useEffect(() => {
+    const initSession = async () => {
+      const token = localStorage.getItem('greentech_token');
+      if (token) {
+        try {
+          // Valenta no backend para pegar as infos frescas (points, onboarding, etc)
+          const data = await api.verifySession();
+          if (data.success && data.user) {
+            setIsLoggedIn(true);
+            setUserRole(data.user.role || 'producer');
+            setUserId(data.user.id);
+            setCurrentView('home');
+          } else {
+            localStorage.removeItem('greentech_token');
+          }
+        } catch (e) {
+          console.error("Sessão inválida", e);
+          localStorage.removeItem('greentech_token');
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initSession();
+  }, []);
 
   // Fetch items from backend (Initial + Polling)
   React.useEffect(() => {
@@ -91,14 +121,32 @@ const App = () => {
       .catch(err => console.error("Failed to delete item:", err));
   };
 
-  const handleLogin = async (email, password) => {
+  const handleLogin = async (email, password, registeredUser = null) => {
     try {
+      if (registeredUser) {
+        setIsLoggedIn(true);
+        setUserRole(registeredUser.role || 'producer');
+        setUserId(registeredUser.id);
+        // O token já foi setado pelo Login.jsx chamando api.register
+        if (!registeredUser.onboarding_completed) {
+          setShowOnboarding(true);
+        } else {
+          setCurrentView('home');
+        }
+        return;
+      }
+
       const data = await api.login(email, password);
       if (data.success) {
         setIsLoggedIn(true);
         setUserRole(data.user.role || 'producer');
         setUserId(data.user.id);
-        setCurrentView('home');
+        saveSession(data.user);
+        if (!data.user.onboarding_completed) {
+          setShowOnboarding(true);
+        } else {
+          setCurrentView('home');
+        }
       } else {
         alert(data.message || 'Login falhou');
       }
@@ -108,7 +156,29 @@ const App = () => {
     }
   };
 
+  const handleGoogleLogin = (userData) => {
+    setIsLoggedIn(true);
+    setUserRole(userData.role || 'producer');
+    setUserId(userData.id);
+    if (!userData.onboarding_completed) {
+      setShowOnboarding(true);
+    } else {
+      setCurrentView('home');
+    }
+  };
+
+  const handleOnboardingComplete = async () => {
+    try {
+      await api.completeOnboarding(userId, userRole);
+    } catch (err) {
+      console.error('Erro ao salvar onboarding:', err);
+    }
+    setShowOnboarding(false);
+    setCurrentView('home');
+  };
+
   const handleLogout = () => {
+    localStorage.removeItem('greentech_token');
     setIsLoggedIn(false);
     setCurrentView('login');
     setUserRole('producer');
@@ -119,10 +189,25 @@ const App = () => {
     setCurrentView(view);
   };
 
+  // Enquanto carrega a sessão, não mostrar nada
+  if (isLoading) {
+    return <div className="app-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#27ae60', animation: 'spin 1s linear infinite' }}>progress_activity</span>
+    </div>;
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="app-shell">
-        <Login onLogin={handleLogin} />
+        <Login onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} />
+      </div>
+    );
+  }
+
+  if (showOnboarding) {
+    return (
+      <div className="app-shell">
+        <Onboarding onComplete={handleOnboardingComplete} />
       </div>
     );
   }

@@ -80,7 +80,8 @@ app.post('/api/login', async (req, res) => {
                     email: producer.email,
                     points: producer.points,
                     role: 'producer',
-                    avatar_url: producer.avatar_url
+                    avatar_url: producer.avatar_url,
+                    onboarding_completed: !!producer.onboarding_completed
                 }
             });
         }
@@ -108,7 +109,8 @@ app.post('/api/login', async (req, res) => {
                     email: collector.email,
                     earnings: collector.earnings,
                     role: 'collector',
-                    avatar_url: collector.avatar_url
+                    avatar_url: collector.avatar_url,
+                    onboarding_completed: !!collector.onboarding_completed
                 }
             });
         }
@@ -180,12 +182,142 @@ app.post('/api/register', async (req, res) => {
                 role: role,
                 avatar_url: newUser.avatar_url,
                 points: newUser.points || 0,
-                earnings: newUser.earnings || 0
+                earnings: newUser.earnings || 0,
+                onboarding_completed: false
             }
         });
     } catch (err) {
         console.error("Register error:", err);
         res.status(500).json({ success: false, message: 'Erro interno no servidor.' });
+    }
+});
+// --- GOOGLE AUTH ---
+app.post('/api/auth/google', async (req, res) => {
+    const { name, email, photoUrl, role } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email obrigatório' });
+
+    try {
+        // Tentar buscar em producers
+        let user = await db.get('SELECT * FROM producers WHERE email = ?', [email]);
+        if (user) {
+            const token = jwt.sign({ id: user.id, role: 'producer' }, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({
+                success: true,
+                token,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: 'producer',
+                    avatar_url: user.avatar_url || photoUrl,
+                    points: user.points,
+                    onboarding_completed: !!user.onboarding_completed
+                },
+                isNewUser: false
+            });
+        }
+
+        // Tentar buscar em collectors
+        user = await db.get('SELECT * FROM collectors WHERE email = ?', [email]);
+        if (user) {
+            const token2 = jwt.sign({ id: user.id, role: 'collector' }, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({
+                success: true,
+                token: token2,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: 'collector',
+                    avatar_url: user.avatar_url || photoUrl,
+                    earnings: user.earnings,
+                    onboarding_completed: !!user.onboarding_completed
+                },
+                isNewUser: false
+            });
+        }
+
+        // Não existe → criar novo como producer (padrão)
+        const userRole = role || 'producer';
+        const table = userRole === 'collector' ? 'collectors' : 'producers';
+        const randomPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        const result = await db.run(
+            `INSERT INTO ${table} (name, email, password, avatar_url) VALUES (?, ?, ?, ?)`,
+            [name || email.split('@')[0], email, hashedPassword, photoUrl || '']
+        );
+
+        const newUser = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [
+            result.lastID || result.id
+        ]);
+
+        const newToken = jwt.sign({ id: newUser.id, role: userRole }, JWT_SECRET, { expiresIn: '7d' });
+
+        res.json({
+            success: true,
+            token: newToken,
+            user: {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+                role: userRole,
+                avatar_url: newUser.avatar_url,
+                points: newUser.points || 0,
+                earnings: newUser.earnings || 0,
+                onboarding_completed: false
+            },
+            isNewUser: true
+        });
+    } catch (err) {
+        console.error('Google auth error:', err);
+        res.status(500).json({ success: false, message: 'Erro interno no servidor.' });
+    }
+});
+
+// --- ROTA DE VALIDAÇÃO DE SESSÃO (/me) ---
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const { id, role } = req.user;
+        const table = role === 'collector' ? 'collectors' : 'producers';
+        
+        const user = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Usuário não encontrado' });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: role,
+                avatar_url: user.avatar_url,
+                points: user.points || 0,
+                earnings: user.earnings || 0,
+                onboarding_completed: !!user.onboarding_completed
+            }
+        });
+    } catch (err) {
+        console.error('Auth verify error:', err);
+        res.status(500).json({ success: false, message: 'Erro interno' });
+    }
+});
+
+// --- ONBOARDING ---
+app.put('/api/user/onboarding', async (req, res) => {
+    const { id, role } = req.body;
+    if (!id || !role) return res.status(400).json({ error: 'Faltando id ou role' });
+
+    const table = role === 'producer' ? 'producers' : 'collectors';
+    try {
+        await db.run(`UPDATE ${table} SET onboarding_completed = 1 WHERE id = ?`, [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Erro ao atualizar onboarding:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

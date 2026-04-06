@@ -190,5 +190,22 @@ export const api = {
             { id: 'electronic', title: 'Eletrônicos', description: 'Celulares antigos, cabos, baterias. Nunca descarte no lixo comum!', icon: '🔌' },
             { id: 'organic', title: 'Orgânico', description: 'Restos de comida, cascas de frutas. Ideal para compostagem.', icon: '🍎' }
         ];
+    },
+
+    completeOnboarding: async (userId, role) => {
+        const response = await fetch(`${API_BASE_URL}/user/onboarding`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: userId, role })
+        });
+        return response.json();
+    },
+
+    verifySession: async () => {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Unauthorized');
+        return response.json();
     }
 };

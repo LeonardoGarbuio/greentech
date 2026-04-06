@@ -94,8 +94,12 @@ export const initDb = async (force = false) => {
                 points INTEGER DEFAULT 0,
                 weight_recycled REAL DEFAULT 0,
                 level TEXT DEFAULT 'Iniciante',
-                avatar_url TEXT
+                avatar_url TEXT,
+                onboarding_completed INTEGER DEFAULT 0
             )`);
+
+            // Migração: adicionar coluna se tabela já existir
+            await client.query(`ALTER TABLE producers ADD COLUMN IF NOT EXISTS onboarding_completed INTEGER DEFAULT 0`).catch(() => {});
 
             await client.query(`CREATE TABLE IF NOT EXISTS producer_notifications (
                 id SERIAL PRIMARY KEY,
@@ -128,8 +132,12 @@ export const initDb = async (force = false) => {
                 collections_count INTEGER DEFAULT 0,
                 vehicle_type TEXT,
                 rating REAL DEFAULT 5.0,
-                avatar_url TEXT
+                avatar_url TEXT,
+                onboarding_completed INTEGER DEFAULT 0
             )`);
+
+            // Migração: adicionar coluna se tabela já existir
+            await client.query(`ALTER TABLE collectors ADD COLUMN IF NOT EXISTS onboarding_completed INTEGER DEFAULT 0`).catch(() => {});
 
             await client.query(`CREATE TABLE IF NOT EXISTS collector_notifications (
                 id SERIAL PRIMARY KEY,
