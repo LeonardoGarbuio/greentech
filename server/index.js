@@ -3,6 +3,8 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from './db.js';
+import traceabilityService from './services/traceabilityService.js';
+import aiService from './services/aiService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -347,12 +349,18 @@ app.get('/api/user', async (req, res) => {
 // --- ITEMS (MARKETPLACE) ---
 
 app.get('/api/items', async (req, res) => {
-    const { collectorId } = req.query;
+    const { collectorId, producerId } = req.query;
 
     let query = `
-        SELECT items.*, producers.name as producer_name, producers.avatar_url as producer_avatar 
+        SELECT items.*, 
+               producers.name as producer_name, 
+               producers.avatar_url as producer_avatar,
+               collectors.name as collector_name,
+               collectors.avatar_url as collector_avatar,
+               collectors.phone as collector_phone
         FROM items 
         LEFT JOIN producers ON items.producer_id = producers.id 
+        LEFT JOIN collectors ON items.collector_id = collectors.id
         WHERE items.status = 'available'
     `;
 
@@ -361,6 +369,9 @@ app.get('/api/items', async (req, res) => {
     if (collectorId) {
         query += ` OR (items.status = 'reserved' AND items.collector_id = ?)`;
         params.push(collectorId);
+    } else if (producerId) {
+        query += ` OR (items.producer_id = ? AND items.status IN ('available', 'reserved'))`;
+        params.push(producerId);
     }
 
     query += ` ORDER BY items.created_at DESC`;
@@ -386,9 +397,20 @@ app.post('/api/items', authenticateToken, async (req, res) => {
             VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?)
         `, [producer_id, type, title, description, weight_kg, lat, lng, address]);
 
-        console.log("Item created successfully, result:", JSON.stringify(result));
+        const itemId = result.lastID;
+        console.log("Item created successfully, result ID:", itemId);
 
-        res.json({ success: true, id: result.lastID });
+        // GRAVA NO LEDGER CRIPTOGRÁFICO: Bloco Gênesis de Descarte
+        await traceabilityService.addLedgerEntry(itemId, 'DISCARD', producer_id, 'producer', {
+            type,
+            title,
+            weight_kg,
+            address,
+            lat,
+            lng
+        });
+
+        res.json({ success: true, id: itemId });
     } catch (err) {
         console.error("Error creating item:", err.message, err.stack);
         res.status(500).json({ error: err.message });
@@ -406,23 +428,56 @@ app.delete('/api/items/:id', authenticateToken, async (req, res) => {
 }); // Fixed missing brace here
 
 app.put('/api/items/:id/status', authenticateToken, async (req, res) => {
-    const { status, collector_id } = req.body;
+    const { status, collector_id, weightCoop, industryId, batchCode } = req.body;
     const { id } = req.params;
 
-    if (!collector_id) return res.status(400).json({ error: 'Collector ID required' });
+    // Se for reserva ou coleta, precisa de coletor
+    if ((status === 'reserved' || status === 'collected') && !collector_id) {
+        return res.status(400).json({ error: 'Collector ID required for this action' });
+    }
 
     const collectedAt = status === 'collected' ? new Date().toISOString() : null;
 
     try {
-        const result = await db.run("UPDATE items SET status = ?, collector_id = ?, collected_at = ? WHERE id = ?",
-            [status, collector_id, collectedAt, id]);
+        let result;
+        if (collector_id) {
+            result = await db.run("UPDATE items SET status = ?, collector_id = ?, collected_at = ? WHERE id = ?",
+                [status, collector_id, collectedAt, id]);
+        } else {
+            result = await db.run("UPDATE items SET status = ? WHERE id = ?",
+                [status, id]);
+        }
 
-        if (status === 'collected') {
+        // GRAVA NO LEDGER CRIPTOGRÁFICO DE ACORDO COM O STATUS
+        if (status === 'reserved') {
+            await traceabilityService.addLedgerEntry(id, 'RESERVE', collector_id, 'collector', {
+                reserved_at: new Date().toISOString()
+            });
+        } else if (status === 'collected') {
+            await traceabilityService.addLedgerEntry(id, 'COLLECTION', collector_id, 'collector', {
+                collected_at: collectedAt || new Date().toISOString()
+            });
             await updateStatsAfterCollection(id, collector_id);
+        } else if (status === 'homologated') {
+            // Cooperativa valida e pesa o lote
+            await traceabilityService.addLedgerEntry(id, 'COOP_RECEIPT', 1, 'cooperative', {
+                cooperative_name: "Coopercaps Centro",
+                balanza_weight_kg: weightCoop || 12.5,
+                receipt_number: `REC-${Math.floor(Math.random() * 900000) + 100000}`,
+                timestamp_coop: new Date().toISOString()
+            });
+        } else if (status === 'recycled') {
+            // Indústria recicla e emite o crédito final
+            await traceabilityService.addLedgerEntry(id, 'INDUSTRY_RECYCLE', industryId || 101, 'industry', {
+                industry_name: "Coca-Cola Indústrias S.A.",
+                recycling_batch: batchCode || `BATCH-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
+                credit_issued: true
+            });
         }
 
         res.json({ success: true, changes: result.changes });
     } catch (err) {
+        console.error("Error updating item status:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -547,6 +602,325 @@ app.put('/api/user', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+app.put('/api/user/points', async (req, res) => {
+    const { id, role, points } = req.body;
+    if (!id || !role || points === undefined) {
+        return res.status(400).json({ error: 'Missing id, role, or points' });
+    }
+    const table = role === 'producer' ? 'producers' : 'collectors';
+    try {
+        await db.run(`UPDATE ${table} SET points = ? WHERE id = ?`, [points, id]);
+        res.json({ success: true, points });
+    } catch (err) {
+        console.error("Error updating user points:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// 🏢 NOVAS ROTAS: RASTREABILIDADE & B2B ESG
+// ==========================================
+
+// 1. Obter Timeline de Rastreabilidade e Validação Criptográfica do Item
+app.get('/api/traceability/:itemId', async (req, res) => {
+    const { itemId } = req.params;
+    try {
+        const item = await db.get("SELECT items.*, producers.name as producer_name, collectors.name as collector_name FROM items LEFT JOIN producers ON items.producer_id = producers.id LEFT JOIN collectors ON items.collector_id = collectors.id WHERE items.id = ?", [itemId]);
+        
+        if (!item) return res.status(404).json({ error: 'Item não encontrado' });
+
+        // Rodar verificação criptográfica do Ledger
+        const audit = await traceabilityService.verifyLedger(itemId);
+
+        res.json({
+            success: true,
+            item,
+            audit
+        });
+    } catch (err) {
+        console.error("Erro ao obter rastreabilidade:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Obter estatísticas do painel B2B para Coca-Cola, Ambev, Unilever
+app.get('/api/b2b/stats', async (req, res) => {
+    try {
+        // Peso total reciclado no sistema (homologado na balança ou coletado)
+        const weightResult = await db.get("SELECT SUM(weight_kg) as total_weight FROM items WHERE status IN ('collected', 'homologated', 'recycled')");
+        const totalWeight = weightResult?.total_weight || 0;
+
+        // Total de créditos emitidos
+        const creditsResult = await db.query("SELECT * FROM b2b_credits ORDER BY created_at DESC");
+        const totalCreditsBought = creditsResult.rows.reduce((sum, row) => sum + row.weight_kg, 0);
+
+        res.json({
+            success: true,
+            total_recycled_kg: totalWeight,
+            total_credits_bought_kg: totalCreditsBought,
+            co2_saved_tons: parseFloat((totalWeight * 0.0028).toFixed(2)), // Estimativa ESG (2.8 kg CO2 p/ kg de plástico reciclado)
+            transactions_count: weightResult ? 142 : 0, // simulação de contagem total
+            credits_history: creditsResult.rows
+        });
+    } catch (err) {
+        console.error("Erro ao obter estatísticas B2B:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Comprar Créditos de Reciclagem B2B
+app.post('/api/b2b/credits', async (req, res) => {
+    const { companyName, weightKg } = req.body;
+    if (!companyName || !weightKg) {
+        return res.status(400).json({ error: 'Razão social e peso dos créditos em KG são necessários.' });
+    }
+
+    try {
+        const amountPaid = parseFloat((weightKg * 0.35).toFixed(2)); // R$ 0.35 por KG de crédito (valor de mercado)
+        const certificateUuid = crypto.randomUUID ? crypto.randomUUID() : `CERT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        const result = await db.run(
+            "INSERT INTO b2b_credits (company_name, weight_kg, amount_paid, certificate_uuid) VALUES (?, ?, ?, ?)",
+            [companyName, weightKg, amountPaid, certificateUuid]
+        );
+
+        res.json({
+            success: true,
+            creditId: result.lastID,
+            data: {
+                companyName,
+                weightKg,
+                amountPaid,
+                certificateUuid,
+                created_at: new Date().toISOString()
+            }
+        });
+    } catch (err) {
+        console.error("Erro ao adquirir créditos ESG:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// 🤖 NOVAS ROTAS: INTELIGÊNCIA ARTIFICIAL (GEMINI)
+// ==========================================
+
+// 1. Analisar foto do descarte (Visão Computacional + Antifraude)
+app.post('/api/ai/analyze-image', async (req, res) => {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: 'Dados da imagem em Base64 são obrigatórios.' });
+
+    try {
+        const analysis = await aiService.analyzeImage(imageBase64);
+        res.json({ success: true, analysis });
+    } catch (err) {
+        console.error("Erro na rota de análise de imagem IA:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Otimizar rota de coleta para catadores
+app.post('/api/ai/optimize-route', async (req, res) => {
+    const { collectorId, currentCoords, activePoints } = req.body;
+    if (!currentCoords) return res.status(400).json({ error: 'Coordenadas atuais do coletor são obrigatórias.' });
+
+    try {
+        const routeOptimization = await aiService.optimizeRoute(collectorId, currentCoords, activePoints || []);
+        res.json({ success: true, ...routeOptimization });
+    } catch (err) {
+        console.error("Erro na rota de otimização de rota IA:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Estimar renda mensal e fornecer coach de metas
+app.post('/api/ai/financial-forecast', async (req, res) => {
+    const { collectorId } = req.body;
+    if (!collectorId) return res.status(400).json({ error: 'Collector ID é obrigatório.' });
+
+    try {
+        const forecast = await aiService.getFinancialForecast(collectorId);
+        res.json({ success: true, forecast });
+    } catch (err) {
+        console.error("Erro na rota de previsão de faturamento IA:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// ==========================================
+// 💬 ROTAS DO SISTEMA DE CHAT (PRODUTOR & CATADOR)
+// ==========================================
+
+// 1. Obter ou Criar Conversa (Chat)
+app.post('/api/chats', authenticateToken, async (req, res) => {
+    const { producer_id, collector_id } = req.body;
+    if (!producer_id || !collector_id) {
+        return res.status(400).json({ error: 'IDs do produtor e coletor são obrigatórios.' });
+    }
+
+    try {
+        // Verificar se já existe conversa
+        let chat = await db.get(
+            "SELECT * FROM chats WHERE producer_id = ? AND collector_id = ?",
+            [producer_id, collector_id]
+        );
+
+        if (!chat) {
+            // Criar nova conversa
+            const result = await db.run(
+                "INSERT INTO chats (producer_id, collector_id, last_message, last_message_time) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                [producer_id, collector_id, 'Conversa iniciada']
+            );
+            chat = {
+                id: result.lastID,
+                producer_id,
+                collector_id,
+                last_message: 'Conversa iniciada',
+                last_message_time: new Date().toISOString()
+            };
+        }
+
+        res.json({ success: true, chat });
+    } catch (err) {
+        console.error("Erro ao obter/criar conversa:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Listar Conversas Ativas do Usuário Autenticado
+app.get('/api/chats', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    try {
+        let query = '';
+        let params = [userId];
+
+        if (userRole === 'producer') {
+            // Usuário é produtor: juntar dados do coletor
+            query = `
+                SELECT chats.*, 
+                       collectors.name as partner_name, 
+                       collectors.avatar_url as partner_avatar,
+                       collectors.phone as partner_phone,
+                       'collector' as partner_role
+                FROM chats
+                INNER JOIN collectors ON chats.collector_id = collectors.id
+                WHERE chats.producer_id = ?
+                ORDER BY chats.last_message_time DESC
+            `;
+        } else if (userRole === 'collector') {
+            // Usuário é coletor: juntar dados do produtor
+            query = `
+                SELECT chats.*, 
+                       producers.name as partner_name, 
+                       producers.avatar_url as partner_avatar,
+                       producers.phone as partner_phone,
+                       'producer' as partner_role
+                FROM chats
+                INNER JOIN producers ON chats.producer_id = producers.id
+                WHERE chats.collector_id = ?
+                ORDER BY chats.last_message_time DESC
+            `;
+        } else {
+            return res.status(400).json({ error: 'Regra de usuário inválida para o chat.' });
+        }
+
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Erro ao listar conversas:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Obter Histórico de Mensagens de um Chat Específico
+app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    try {
+        // Verificar se a conversa pertence ao usuário atual
+        const chat = await db.get("SELECT * FROM chats WHERE id = ?", [chatId]);
+        if (!chat) {
+            return res.status(404).json({ error: 'Conversa não encontrada.' });
+        }
+
+        if (
+            (userRole === 'producer' && chat.producer_id !== userId) ||
+            (userRole === 'collector' && chat.collector_id !== userId)
+        ) {
+            return res.status(403).json({ error: 'Acesso negado a esta conversa.' });
+        }
+
+        const messagesResult = await db.query(
+            "SELECT * FROM messages WHERE chat_id = ? ORDER BY timestamp ASC",
+            [chatId]
+        );
+
+        res.json(messagesResult.rows);
+    } catch (err) {
+        console.error("Erro ao obter mensagens:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Enviar uma Nova Mensagem no Chat
+app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
+    const { chatId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (!content || !content.trim()) {
+        return res.status(400).json({ error: 'Mensagem vazia.' });
+    }
+
+    try {
+        // Verificar se a conversa existe e pertence ao usuário atual
+        const chat = await db.get("SELECT * FROM chats WHERE id = ?", [chatId]);
+        if (!chat) {
+            return res.status(404).json({ error: 'Conversa não encontrada.' });
+        }
+
+        if (
+            (userRole === 'producer' && chat.producer_id !== userId) ||
+            (userRole === 'collector' && chat.collector_id !== userId)
+        ) {
+            return res.status(403).json({ error: 'Acesso negado a esta conversa.' });
+        }
+
+        // Inserir a nova mensagem
+        const insertResult = await db.run(
+            "INSERT INTO messages (chat_id, sender_role, content, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            [chatId, userRole, content.trim()]
+        );
+
+        const newMessage = {
+            id: insertResult.lastID,
+            chat_id: parseInt(chatId),
+            sender_role: userRole,
+            content: content.trim(),
+            timestamp: new Date().toISOString(),
+            is_read: 0
+        };
+
+        // Atualizar metadados da conversa
+        await db.run(
+            "UPDATE chats SET last_message = ?, last_message_time = CURRENT_TIMESTAMP WHERE id = ?",
+            [content.trim(), chatId]
+        );
+
+        res.status(201).json({ success: true, message: newMessage });
+    } catch (err) {
+        console.error("Erro ao enviar mensagem:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Allow Vercel to export app, but listen if run directly
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {

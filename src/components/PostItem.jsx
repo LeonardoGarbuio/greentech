@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Geolocation } from '@capacitor/geolocation';
+import { api } from '../services/api';
 
 const PostItem = ({ onBack, onAddItem }) => {
     const [type, setType] = useState('paper');
@@ -8,6 +9,9 @@ const PostItem = ({ onBack, onAddItem }) => {
     const [description, setDescription] = useState('');
     const [locationStatus, setLocationStatus] = useState('idle'); // idle, loading, success, error
     const [coords, setCoords] = useState(null);
+    const [analyzingImage, setAnalyzingImage] = useState(false);
+    const [aiDetails, setAiDetails] = useState(null);
+    const [fraudError, setFraudError] = useState('');
     const fileInputRef = React.useRef(null);
 
     const handleImageUpload = (e) => {
@@ -15,6 +19,50 @@ const PostItem = ({ onBack, onAddItem }) => {
         if (file) {
             const imageUrl = URL.createObjectURL(file);
             setImage(imageUrl);
+
+            // Convert to base64 and analyze with AI
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64Data = reader.result;
+                try {
+                    setAnalyzingImage(true);
+                    setFraudError('');
+                    setAiDetails(null);
+                    const aiResult = await api.analyzeImage(base64Data);
+                    setAnalyzingImage(false);
+
+                    if (aiResult.isFake) {
+                        setFraudError(aiResult.fraudReason || "Alerta de fraude! Imagem inválida ou tela detectada.");
+                        alert(`⚠️ Alerta Antifraude: ${aiResult.fraudReason}`);
+                    } else {
+                        setAiDetails(aiResult);
+                        
+                        // Auto-populate type & weight based on AI
+                        if (aiResult.materials && aiResult.materials.length > 0) {
+                            const mainMaterial = aiResult.materials[0].type;
+                            const reverseMapping = {
+                                'paper': 'Papel',
+                                'plastic': 'Plástico',
+                                'glass': 'Vidro',
+                                'metal': 'Metal',
+                                'aluminum': 'Metal',
+                                'electronic': 'Eletrônico'
+                            };
+                            if (reverseMapping[mainMaterial]) {
+                                setType(reverseMapping[mainMaterial]);
+                            }
+                        }
+
+                        if (aiResult.totalWeightKg) {
+                            setWeight(aiResult.totalWeightKg.toString());
+                        }
+                    }
+                } catch (err) {
+                    console.error("AI image analysis error:", err);
+                    setAnalyzingImage(false);
+                }
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -145,6 +193,78 @@ const PostItem = ({ onBack, onAddItem }) => {
                         </>
                     )}
                 </div>
+
+                {/* AI Status or Feedback */}
+                {analyzingImage && (
+                    <div style={{
+                        background: '#e6f7ff',
+                        border: '1px solid #91d5ff',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        fontSize: '0.85rem',
+                        color: '#0050b3',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}>
+                        <span className="material-symbols-outlined" style={{ animation: 'spin 1.5s linear infinite', fontSize: '1.2rem' }}>progress_activity</span>
+                        <span>🤖 Copiloto IA analisando a imagem para classificar os materiais e prevenir fraudes...</span>
+                    </div>
+                )}
+
+                {fraudError && (
+                    <div style={{
+                        background: '#fff2f0',
+                        border: '1px solid #ffccc7',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        fontSize: '0.85rem',
+                        color: '#a8071a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}>
+                        <span>⚠️</span>
+                        <span><strong>Alerta Antifraude:</strong> {fraudError}</span>
+                    </div>
+                )}
+
+                {aiDetails && !analyzingImage && !fraudError && (
+                    <div style={{
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #e6fdf0 100%)',
+                        border: '1.5px solid #a7f3d0',
+                        borderRadius: '16px',
+                        padding: '16px',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)',
+                        fontFamily: "'Outfit', sans-serif"
+                    }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: '#047857', fontWeight: 800 }}>🤖 Análise da IA Concluída!</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: '#065f46' }}>
+                            <div>
+                                <strong>Materiais Detectados:</strong>
+                                <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+                                    {aiDetails.materials.map((m, idx) => (
+                                        <li key={idx}>
+                                            {m.label} ({m.weightKg.toFixed(2)} kg)
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px dashed #a7f3d0', paddingTop: '8px', marginTop: '4px' }}>
+                                <span>Peso Total IA:</span>
+                                <strong>{aiDetails.totalWeightKg.toFixed(2)} KG</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Estimativa de ganho do catador:</span>
+                                <strong>R$ {aiDetails.estimatedEarnings.toFixed(2)}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857', fontWeight: 800 }}>
+                                <span>GreenCoins (GC) estimadas:</span>
+                                <span>+{aiDetails.greenCoins} GC</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Type Selection */}
                 <div>

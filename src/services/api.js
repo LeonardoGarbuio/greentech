@@ -20,6 +20,14 @@ if (isNative) {
     }
 }
 
+// Auto-detect localhost/dev environment and override Vercel URL
+if (!isNative && typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        baseUrl = 'http://localhost:3002/api';
+    }
+}
+
 export const API_BASE_URL = baseUrl;
 
 // Helper function to include the JWT token in headers
@@ -61,6 +69,16 @@ export const api = {
         return response.json();
     },
 
+    updateUserPoints: async (userId, role, points) => {
+        const response = await fetch(`${API_BASE_URL}/user/points`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: userId, role, points })
+        });
+        if (!response.ok) throw new Error('Failed to update user points');
+        return response.json();
+    },
+
     getHistory: async (userId, role) => {
         const response = await fetch(`${API_BASE_URL}/history?userId=${userId}&role=${role}`);
         if (!response.ok) throw new Error('Failed to fetch history');
@@ -69,9 +87,12 @@ export const api = {
 
     // Item endpoints
     getItems: async (userId, role) => {
-        const url = role === 'collector' && userId
-            ? `${API_BASE_URL}/items?collectorId=${userId}`
-            : `${API_BASE_URL}/items`;
+        let url = `${API_BASE_URL}/items`;
+        if (role === 'collector' && userId) {
+            url = `${API_BASE_URL}/items?collectorId=${userId}`;
+        } else if (role === 'producer' && userId) {
+            url = `${API_BASE_URL}/items?producerId=${userId}`;
+        }
         console.log("Fetching items from:", url);
         const response = await fetch(url);
         const data = await response.json();
@@ -206,6 +227,126 @@ export const api = {
             headers: getAuthHeaders()
         });
         if (!response.ok) throw new Error('Unauthorized');
+        return response.json();
+    },
+
+    // --- MÉTODOS DE INTELIGÊNCIA ARTIFICIAL (GEMINI) ---
+    analyzeImage: async (imageBase64) => {
+        const response = await fetch(`${API_BASE_URL}/ai/analyze-image`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ imageBase64 })
+        });
+        if (!response.ok) throw new Error('Erro ao analisar imagem com IA');
+        return response.json();
+    },
+
+    optimizeRoute: async (collectorId, currentCoords, activePoints) => {
+        const response = await fetch(`${API_BASE_URL}/ai/optimize-route`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ collectorId, currentCoords, activePoints })
+        });
+        if (!response.ok) throw new Error('Erro ao otimizar rota com IA');
+        return response.json();
+    },
+
+    getFinancialForecast: async (collectorId) => {
+        const response = await fetch(`${API_BASE_URL}/ai/financial-forecast`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ collectorId })
+        });
+        if (!response.ok) throw new Error('Erro ao buscar previsão financeira IA');
+        return response.json();
+    },
+
+    // --- MÉTODOS DE RASTREABILIDADE & B2B ESG ---
+    getTraceabilityLedger: async (itemId) => {
+        const response = await fetch(`${API_BASE_URL}/traceability/${itemId}`);
+        if (!response.ok) throw new Error('Erro ao carregar auditoria de rastreabilidade');
+        return response.json();
+    },
+
+    getB2BStats: async () => {
+        const response = await fetch(`${API_BASE_URL}/b2b/stats`);
+        if (!response.ok) throw new Error('Erro ao carregar estatísticas B2B');
+        return response.json();
+    },
+
+    buyRecyclingCredits: async (companyName, weightKg) => {
+        const response = await fetch(`${API_BASE_URL}/b2b/credits`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ companyName, weightKg })
+        });
+        if (!response.ok) throw new Error('Erro ao comprar créditos ESG');
+        return response.json();
+    },
+
+    // Atualização especializada para Cooperativa Homologar
+    coopHomologateItem: async (itemId, weightCoop) => {
+        const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ 
+                status: 'homologated', 
+                weightCoop 
+            })
+        });
+        if (!response.ok) throw new Error('Erro ao homologar item na cooperativa');
+        return response.json();
+    },
+
+    // Atualização especializada para Indústria Reciclar (Crédito completo)
+    industryRecycleItem: async (itemId, industryId, batchCode) => {
+        const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ 
+                status: 'recycled', 
+                industryId, 
+                batchCode 
+            })
+        });
+        if (!response.ok) throw new Error('Erro ao registrar reciclagem final na indústria');
+        return response.json();
+    },
+
+    // --- MÉTODOS DO SISTEMA DE CHAT ---
+    getOrCreateChat: async (producerId, collectorId) => {
+        const response = await fetch(`${API_BASE_URL}/chats`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ producer_id: producerId, collector_id: collectorId })
+        });
+        if (!response.ok) throw new Error('Erro ao abrir conversa');
+        return response.json();
+    },
+
+    getChats: async () => {
+        const response = await fetch(`${API_BASE_URL}/chats`, {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Erro ao carregar conversas');
+        return response.json();
+    },
+
+    getChatMessages: async (chatId) => {
+        const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Erro ao carregar histórico de mensagens');
+        return response.json();
+    },
+
+    sendMessage: async (chatId, content) => {
+        const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ content })
+        });
+        if (!response.ok) throw new Error('Erro ao enviar mensagem');
         return response.json();
     }
 };

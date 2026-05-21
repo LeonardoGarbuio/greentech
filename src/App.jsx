@@ -13,6 +13,8 @@ import Garden from './components/Garden';
 import Leaderboard from './components/Leaderboard';
 import Guide from './components/Guide';
 import History from './components/History';
+import EcoStore from './components/EcoStore';
+import B2BDashboard from './components/B2BDashboard';
 import { api } from './services/api';
 
 const App = () => {
@@ -23,6 +25,7 @@ const App = () => {
   const [currentView, setCurrentView] = useState('home');
   const [feedItems, setFeedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeChat, setActiveChat] = useState(null);
 
   // Restaurar sessão de VERDADE via banco de dados
   React.useEffect(() => {
@@ -185,7 +188,12 @@ const App = () => {
     setUserId(null);
   };
 
-  const handleNavigate = (view) => {
+  const handleNavigate = (view, params = null) => {
+    if (view === 'chat') {
+      setActiveChat(params);
+    } else {
+      setActiveChat(null);
+    }
     setCurrentView(view);
   };
 
@@ -238,7 +246,7 @@ const App = () => {
       case 'profile':
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} user={user} />;
       case 'chat':
-        return <Chat onNavigate={handleNavigate} />;
+        return <Chat onNavigate={handleNavigate} user={user} activeChat={activeChat} setActiveChat={setActiveChat} />;
       case 'map':
         return <Map onNavigate={handleNavigate} />;
       case 'garden':
@@ -247,6 +255,10 @@ const App = () => {
         return <Leaderboard user={user} />;
       case 'guide':
         return <Guide onNavigate={handleNavigate} />;
+      case 'store':
+        return <EcoStore user={user} onUpdateUser={() => {}} />;
+      case 'b2b':
+        return <B2BDashboard onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} user={user} />;
     }

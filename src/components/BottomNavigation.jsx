@@ -61,7 +61,7 @@ const BottomNavigation = ({ currentView, onNavigate, userRole }) => {
                         }}
                     >
                         <div style={{
-                            color: isActive ? 'var(--primary-color)' : 'inherit',
+                            color: isActive ? '#10b981' : 'inherit', // green accent
                             transform: isActive ? 'translateY(-2px)' : 'none',
                             transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
                         }}>

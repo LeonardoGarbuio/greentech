@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import CoinBadge from './CoinBadge';
 
 const Home = ({ onNavigate, user: currentUser }) => {
     const [user, setUser] = useState({ points: 0, weight_recycled: 0 });
@@ -74,37 +75,41 @@ const Home = ({ onNavigate, user: currentUser }) => {
                     <h1 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', fontWeight: '700', letterSpacing: '-0.5px' }}>GreenTech</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Painel de Controle</p>
                 </div>
-                <div
-                    onClick={() => onNavigate('profile')}
-                    style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: 'var(--bg-color)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        position: 'relative'
-                    }}
-                >
-                    {/* Bell Icon SVG */}
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    {notificationCount > 0 && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            width: '10px',
-                            height: '10px',
-                            background: '#e74c3c',
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CoinBadge coins={user.points || 0} onClick={() => onNavigate('store')} />
+
+                    <div
+                        onClick={() => onNavigate('profile')}
+                        style={{
+                            width: '40px',
+                            height: '40px',
                             borderRadius: '50%',
-                            border: '2px solid white'
-                        }}></div>
-                    )}
+                            background: 'var(--bg-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            position: 'relative'
+                        }}
+                    >
+                        {/* Bell Icon SVG */}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        {notificationCount > 0 && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                width: '10px',
+                                height: '10px',
+                                background: '#e74c3c',
+                                borderRadius: '50%',
+                                border: '2px solid white'
+                            }}></div>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -256,6 +261,7 @@ const Home = ({ onNavigate, user: currentUser }) => {
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </div>
                 </button>
+
             </div>
 
             <div style={{ padding: '24px' }}>

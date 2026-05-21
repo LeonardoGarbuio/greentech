@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
+import Garden from './Garden';
+import { api } from '../services/api';
 
-const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, userRole }) => {
+const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, userRole, onNavigate }) => {
     const [isVisible, setIsVisible] = useState(false);
     const [showScheduleInput, setShowScheduleInput] = useState(false);
     const [scheduleTime, setScheduleTime] = useState('');
+    const [showGarden, setShowGarden] = useState(false);
 
     useEffect(() => {
         if (item) {
             setIsVisible(true);
         } else {
             setIsVisible(false);
+            setShowGarden(false);
         }
     }, [item]);
 
@@ -95,7 +99,7 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                             </div>
                         </div>
 
-                        <div>
+                        <div style={{ flex: 1 }}>
                             <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.producer_name || 'Doador Anônimo'}</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Doador Verificado • {item.producer_level || 'Iniciante'}</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
@@ -109,22 +113,134 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                     </div>
                 )}
 
+                {/* Ver Eco-Jardim Button - Show for non-owner views */}
+                {!isOwner && item.producer_id && (
+                    <button
+                        onClick={() => setShowGarden(true)}
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            marginBottom: '20px',
+                            background: 'linear-gradient(135deg, #e6f9f1 0%, #d1fae5 100%)',
+                            border: '1.5px solid #a7f3d0',
+                            borderRadius: '16px',
+                            color: '#047857',
+                            fontWeight: 700,
+                            fontSize: '0.9rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.2)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.1)'; }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                        </svg>
+                        Ver Eco-Jardim de {item.producer_name || 'Doador'}
+                    </button>
+                )}
+
                 {/* Owner Message */}
                 {isOwner && (
                     <div style={{
                         marginBottom: '24px',
                         padding: '16px',
-                        background: 'var(--primary-light)',
+                        background: item.status === 'reserved' ? '#fff9db' : 'var(--primary-light)',
                         borderRadius: '16px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
+                        flexDirection: 'column',
+                        gap: '12px',
+                        border: item.status === 'reserved' ? '1px solid #ffe066' : 'none'
                     }}>
-                        <span style={{ fontSize: '1.5rem' }}>📢</span>
-                        <div>
-                            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-color)' }}>Seu Anúncio</h3>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Este item foi anunciado por você e está visível para catadores.</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '1.5rem' }}>{item.status === 'reserved' ? '🤝' : '📢'}</span>
+                            <div>
+                                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: item.status === 'reserved' ? '#f59f00' : 'var(--primary-color)' }}>
+                                    {item.status === 'reserved' ? 'Coleta Reservada!' : 'Seu Anúncio'}
+                                </h3>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    {item.status === 'reserved' 
+                                        ? `O catador ${item.collector_name || 'Maria Coletora'} se propôs a buscar este material.`
+                                        : 'Este item foi anunciado por você e está visível para catadores.'}
+                                </p>
+                            </div>
                         </div>
+
+                        {item.status === 'reserved' && (
+                            <div style={{
+                                marginTop: '8px',
+                                padding: '12px',
+                                background: 'white',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                            }}>
+                                <div style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '50%',
+                                    background: '#eee',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1.2rem',
+                                    overflow: 'hidden'
+                                }}>
+                                    {item.collector_avatar ? <img src={item.collector_avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700' }}>{item.collector_name || 'Catador'}</h4>
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Telefone: {item.collector_phone || 'Não informado'}</span>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const chatRes = await api.getOrCreateChat(item.producer_id, item.collector_id);
+                                            if (chatRes.success) {
+                                                onClose();
+                                                onNavigate('chat', {
+                                                    chatId: chatRes.chat.id,
+                                                    producerId: item.producer_id,
+                                                    collectorId: item.collector_id,
+                                                    partnerName: item.collector_name || 'Catador'
+                                                });
+                                            }
+                                        } catch (error) {
+                                            console.error("Erro ao iniciar chat:", error);
+                                            alert("Não foi possível iniciar o chat.");
+                                        }
+                                    }}
+                                    style={{
+                                        background: 'var(--primary-color)',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '8px 16px',
+                                        borderRadius: '10px',
+                                        fontWeight: '700',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 8px var(--primary-glow)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                    </svg>
+                                    Conversar
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -285,6 +401,47 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                             >
                                 ✅ Sim, Confirmar Coleta
                             </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const chatRes = await api.getOrCreateChat(item.producer_id, currentUserId);
+                                        if (chatRes.success) {
+                                            onClose();
+                                            onNavigate('chat', {
+                                                chatId: chatRes.chat.id,
+                                                producerId: item.producer_id,
+                                                collectorId: currentUserId,
+                                                partnerName: item.producer_name || 'Doador'
+                                            });
+                                        }
+                                    } catch (error) {
+                                        console.error("Erro ao iniciar chat:", error);
+                                        alert("Não foi possível iniciar o chat.");
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px',
+                                    marginTop: '8px',
+                                    fontSize: '1.05rem',
+                                    background: 'white',
+                                    color: 'var(--primary-color)',
+                                    border: '1.5px solid var(--primary-color)',
+                                    borderRadius: '12px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                Falar com o Doador
+                            </button>
                         </div>
                     ) : item.status === 'reserved' ? (
                         // Reserved by SOMEONE ELSE
@@ -388,6 +545,88 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                     Fechar
                 </button>
             </div>
+
+            {/* Garden Modal Overlay */}
+            {showGarden && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px',
+                    animation: 'fadeIn 0.3s ease-out'
+                }}>
+                    <div style={{
+                        width: '100%',
+                        maxWidth: '480px',
+                        maxHeight: '85vh',
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(20px)',
+                        borderRadius: '28px',
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '16px 20px',
+                            borderBottom: '1px solid rgba(0,0,0,0.06)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'linear-gradient(135deg, #e6f9f1 0%, #d1fae5 100%)'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#047857' }}>
+                                    Eco-Jardim de {item.producer_name || 'Doador'}
+                                </h3>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#059669' }}>Conquistas ecológicas</p>
+                            </div>
+                            <button
+                                onClick={() => setShowGarden(false)}
+                                style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    border: 'none',
+                                    background: 'rgba(0,0,0,0.08)',
+                                    color: '#333',
+                                    fontSize: '1.1rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        {/* Garden content */}
+                        <div style={{ flex: 1, overflowY: 'auto' }}>
+                            <Garden
+                                user={{ id: item.producer_id, role: 'producer' }}
+                                viewOnly={true}
+                                userId={item.producer_id}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `}</style>
         </>
     );
 };

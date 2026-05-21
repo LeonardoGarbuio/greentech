@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import CoinBadge from './CoinBadge';
 
 const CollectorHome = ({ onNavigate, user: currentUser }) => {
     const [stats, setStats] = useState({ earnings: 0, collections: 0 });
     const [history, setHistory] = useState([]);
+    const [forecast, setForecast] = useState(null);
+    const [loadingForecast, setLoadingForecast] = useState(true);
 
     useEffect(() => {
         if (!currentUser || !currentUser.id) return;
@@ -21,6 +24,17 @@ const CollectorHome = ({ onNavigate, user: currentUser }) => {
                 const historyData = await api.getHistory(currentUser.id, currentUser.role);
                 // Ensure historyData is an array before setting
                 setHistory(Array.isArray(historyData) ? historyData : []);
+
+                // Fetch AI Forecast
+                try {
+                    setLoadingForecast(true);
+                    const forecastData = await api.getFinancialForecast(currentUser.id);
+                    setForecast(forecastData);
+                } catch (e) {
+                    console.error("Erro ao carregar forecast:", e);
+                } finally {
+                    setLoadingForecast(false);
+                }
             } catch (error) {
                 console.error('Error fetching collector data:', error);
             }
@@ -50,35 +64,39 @@ const CollectorHome = ({ onNavigate, user: currentUser }) => {
                     <h1 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', fontWeight: '700', letterSpacing: '-0.5px' }}>GreenTech</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Painel do Catador</p>
                 </div>
-                <div
-                    onClick={() => onNavigate('profile')}
-                    style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: 'var(--bg-color)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        position: 'relative'
-                    }}
-                >
-                    {/* Bell Icon SVG */}
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    <div style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        width: '10px',
-                        height: '10px',
-                        background: '#e74c3c',
-                        borderRadius: '50%',
-                        border: '2px solid white'
-                    }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CoinBadge coins={Math.round(stats.earnings || 0)} onClick={() => onNavigate('store')} />
+
+                    <div
+                        onClick={() => onNavigate('profile')}
+                        style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            background: 'var(--bg-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            position: 'relative'
+                        }}
+                    >
+                        {/* Bell Icon SVG */}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            width: '10px',
+                            height: '10px',
+                            background: '#e74c3c',
+                            borderRadius: '50%',
+                            border: '2px solid white'
+                        }}></div>
+                    </div>
                 </div>
             </header>
 
@@ -124,6 +142,119 @@ const CollectorHome = ({ onNavigate, user: currentUser }) => {
                     <div style={{ marginTop: '8px', width: '100%', height: '4px', background: '#f1f2f6', borderRadius: '2px' }}>
                         <div style={{ width: '60%', height: '100%', background: 'var(--accent-color)', borderRadius: '2px' }}></div>
                     </div>
+                </div>
+            </div>
+
+            {/* Copiloto Financeiro Panel */}
+            <div style={{ padding: '0 24px', marginBottom: '24px' }}>
+                <div style={{
+                    background: 'white',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '24px',
+                    border: '1.5px solid var(--surface-border)',
+                    boxShadow: 'var(--shadow-sm)',
+                    fontFamily: "'Outfit', sans-serif"
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '8px', color: 'var(--primary-color)' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                Planejamento Financeiro
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                Metas inteligentes com base na sua média de coletas.
+                            </p>
+                        </div>
+                    </div>
+
+                    {loadingForecast ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 0' }}>
+                            <div style={{
+                                width: '20px',
+                                height: '20px',
+                                border: '3px solid var(--primary-light)',
+                                borderTop: '3px solid var(--primary-color)',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }} />
+                            <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Analisando padrões e calculando projeções...</span>
+                            <style>{`
+                                @keyframes spin { to { transform: rotate(360deg); } }
+                            `}</style>
+                        </div>
+                    ) : forecast ? (
+                        <div>
+                            {/* Forecast Metrics */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                                <div style={{
+                                    background: '#f8fafc',
+                                    padding: '16px',
+                                    borderRadius: '12px',
+                                    border: '1px solid var(--surface-border)'
+                                }}>
+                                    <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Próx. Mês</span>
+                                    <span style={{ fontSize: '1.4rem', fontWeight: '800', color: '#27ae60' }}>R$ {forecast.nextMonthForecast}</span>
+                                </div>
+                                <div style={{
+                                    background: '#f8fafc',
+                                    padding: '16px',
+                                    borderRadius: '12px',
+                                    border: '1px solid var(--surface-border)'
+                                }}>
+                                    <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '4px' }}>Potencial de Alta</span>
+                                    <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--primary-color)' }}>+{forecast.growthPotentialPercentage}%</span>
+                                </div>
+                            </div>
+
+                            {/* Tips */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.5px' }}>
+                                    Como atingir a meta:
+                                </span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {forecast.tips && forecast.tips.map((tip, idx) => (
+                                        <div key={idx} style={{
+                                            display: 'flex',
+                                            gap: '10px',
+                                            alignItems: 'flex-start',
+                                            background: '#fcfcfc',
+                                            padding: '12px 14px',
+                                            borderRadius: '10px',
+                                            border: '1px solid rgba(0,0,0,0.03)',
+                                            fontSize: '0.85rem',
+                                            lineHeight: 1.4
+                                        }}>
+                                            <span style={{ color: 'var(--primary-color)', fontWeight: '800' }}>{idx + 1}.</span>
+                                            <span style={{ color: 'var(--text-primary)' }}>{tip}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Motivation */}
+                            <div style={{
+                                borderTop: '1px solid var(--surface-border)',
+                                paddingTop: '16px',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-secondary)',
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'flex-start',
+                                lineHeight: 1.4
+                            }}>
+                                <span style={{ fontSize: '1.1rem' }}>💡</span>
+                                <span style={{ fontStyle: 'italic' }}>"{forecast.motivationalMessage}"</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#e74c3c', fontWeight: '500' }}>Não foi possível carregar as previsões financeiras.</p>
+                    )}
                 </div>
             </div>
 

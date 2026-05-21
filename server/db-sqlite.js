@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -8,6 +9,11 @@ const __dirname = dirname(__filename);
 const dbPath = join(__dirname, 'database_v3.sqlite');
 
 let dbInstance = null;
+
+// Helper to generate SHA-256 hashes
+export function generateSHA256(data) {
+    return crypto.createHash('sha256').update(typeof data === 'string' ? data : JSON.stringify(data)).digest('hex');
+}
 
 function getDb() {
     if (!dbInstance) {
@@ -38,6 +44,7 @@ function initDb(db) {
             avatar_url TEXT,
             onboarding_completed INTEGER DEFAULT 0
         )`);
+
 
         db.run(`CREATE TABLE IF NOT EXISTS producer_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,6 +148,28 @@ function initDb(db) {
             FOREIGN KEY(chat_id) REFERENCES chats(id)
         )`);
 
+        // --- B2B & BLOCK-LOG DE RASTREABILIDADE CRIPTOGRÁFICA ---
+        db.run(`CREATE TABLE IF NOT EXISTS traceability_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER,
+            step TEXT, -- 'DISCARD', 'COLLECTION', 'COOP_RECEIPT', 'INDUSTRY_RECYCLE'
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            actor_id INTEGER,
+            actor_role TEXT,
+            payload TEXT,
+            previous_hash TEXT,
+            current_hash TEXT
+        )`);
+
+        db.run(`CREATE TABLE IF NOT EXISTS b2b_credits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT,
+            weight_kg REAL,
+            amount_paid REAL,
+            certificate_uuid TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`);
+
         // Seed if empty
         seedData(db);
     });
@@ -150,7 +179,7 @@ function seedData(db) {
     db.get("SELECT count(*) as count FROM producers", [], (err, row) => {
         if (!err && row && row.count === 0) {
             console.log("Seeding V3 Data...");
-            // ... (Seeding code condensed for brevity/can rely on previous run)
+            // Seed producer Joaõ Doador and SP-based items
             db.run(`INSERT INTO producers (email, password, name, phone, points, weight_recycled, level) 
                    VALUES ('producer@test.com', 'password', 'João Doador', '(11) 99999-9999', 1250, 55.5, 'Reciclador Consciente')`, function (err) {
                 if (!err) {
@@ -158,8 +187,29 @@ function seedData(db) {
                     db.run(`INSERT INTO producer_notifications (producer_id, title, message, type) VALUES 
                         (?, 'Bem-vindo!', 'Comece a reciclar hoje mesmo.', 'system')`, [producerId]);
 
+                    // Original item
                     db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
                         (?, 'paper', 'Papelão Limpo', 'Caixas de mudança desmontadas', 5.0, 'available', -23.5500, -46.6300, 'Rua das Flores, 123')`, [producerId]);
+
+                    // SP Item 1: Paper
+                    db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
+                        (?, 'paper', 'Fardos de Papelão', 'Caixas de papelão ondulado de entregas comerciais', 12.5, 'available', -23.5489, -46.6388, 'Av. Ipiranga, 1040 - República')`, [producerId]);
+
+                    // SP Item 2: Plastic
+                    db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
+                        (?, 'plastic', 'Garrafas PET e Embalagens', 'Garrafas de refrigerante e água mineral limpas e prensadas', 8.2, 'available', -23.5525, -46.6295, 'Rua Galvão Bueno, 350 - Liberdade')`, [producerId]);
+
+                    // SP Item 3: Metal
+                    db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
+                        (?, 'metal', 'Latinhas de Alumínio', 'Sacos cheios de latinhas de cerveja e refrigerante amassadas', 4.5, 'available', -23.5445, -46.6358, 'Rua Direita, 150 - Sé')`, [producerId]);
+
+                    // SP Item 4: Glass
+                    db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
+                        (?, 'glass', 'Garrafas de Vidro (Verde/Ambar)', 'Garrafas vazias de cerveja e vinho separadas em caixa', 15.0, 'available', -23.5562, -46.6435, 'Rua Treze de Maio, 450 - Bela Vista')`, [producerId]);
+
+                    // SP Item 5: Electronic
+                    db.run(`INSERT INTO items (producer_id, type, title, description, weight_kg, status, lat, lng, address) VALUES 
+                        (?, 'electronic', 'Sucata Eletrônica', 'Fontes de computador antigas, cabos e placas de circuito', 6.0, 'available', -23.5412, -46.6415, 'Rua Santa Ifigênia, 280 - Centro')`, [producerId]);
                 }
             });
 
