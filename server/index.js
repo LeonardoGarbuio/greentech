@@ -871,11 +871,11 @@ app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
 // 4. Enviar uma Nova Mensagem no Chat
 app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
     const { chatId } = req.params;
-    const { content } = req.body;
+    const { content, image } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    if (!content || !content.trim()) {
+    if ((!content || !content.trim()) && !image) {
         return res.status(400).json({ error: 'Mensagem vazia.' });
     }
 
@@ -895,15 +895,16 @@ app.post('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
 
         // Inserir a nova mensagem
         const insertResult = await db.run(
-            "INSERT INTO messages (chat_id, sender_role, content, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-            [chatId, userRole, content.trim()]
+            "INSERT INTO messages (chat_id, sender_role, content, image, timestamp) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
+            [chatId, userRole, content ? content.trim() : '', image || null]
         );
 
         const newMessage = {
             id: insertResult.lastID,
             chat_id: parseInt(chatId),
             sender_role: userRole,
-            content: content.trim(),
+            content: content ? content.trim() : '',
+            image: image || null,
             timestamp: new Date().toISOString(),
             is_read: 0
         };

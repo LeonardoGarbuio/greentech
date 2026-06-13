@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import CoinBadge from './CoinBadge';
 
 /* ── Inline SVG icon helper ──────────────────────────────────────────── */
-const getItemSVG = (itemId) => {
+export const getItemSVG = (itemId) => {
     const s = { width: 32, height: 32, fill: 'none', stroke: '#047857', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
     const svgProps = { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: 32, height: 32, fill: 'none', stroke: '#047857', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
 
@@ -107,6 +107,33 @@ const getItemSVG = (itemId) => {
                 </svg>
             );
 
+        case 'decor_pot':
+            return (
+                <svg {...svgProps}>
+                    <path d="M7 6h10l-1 10H8z" />
+                    <path d="M6 6h12v3H6z" />
+                    <path d="M12 6v10" />
+                </svg>
+            );
+
+        case 'decor_bird':
+            return (
+                <svg {...svgProps}>
+                    <path d="M12 2l8 8v12H4V10z" />
+                    <circle cx="12" cy="14" r="3" />
+                    <path d="M12 17v5" />
+                </svg>
+            );
+
+        case 'decor_gnome':
+            return (
+                <svg {...svgProps}>
+                    <path d="M12 2L6 10h12z" />
+                    <circle cx="12" cy="14" r="4" />
+                    <path d="M10 14h4" />
+                </svg>
+            );
+
         /* Star badge – premium profile */
         case 'coll_star':
             return (
@@ -204,7 +231,8 @@ const SuccessIcon = ({ size = 16 }) => (
 
 /* ── Main component (logic unchanged) ────────────────────────────────── */
 const EcoStore = ({ user: currentUser, onUpdateUser }) => {
-    const [activeTab, setActiveTab] = useState(currentUser?.role === 'collector' ? 'collector' : 'citizen');
+    // Remove activeTab, user role dictates the view
+    const userRole = currentUser?.role === 'collector' ? 'collector' : 'citizen';
     const [coins, setCoins] = useState(currentUser?.points || 0);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('success');  // 'success' | 'error'
@@ -281,13 +309,13 @@ const EcoStore = ({ user: currentUser, onUpdateUser }) => {
     };
 
     const citizenItems = [
-        { id: 'coca_10', title: 'R$ 10 Coca-Cola Retornavel', description: 'Desconto exclusivo na compra de embalagens retornaveis Coca-Cola.', cost: 80, emoji: 'coca_10', sponsor: 'Coca-Cola', type: 'coupon' },
-        { id: 'ambev_15', title: '15% Off Ze Delivery', description: 'Cupom de 15% de desconto para pedidos no app Ze Delivery.', cost: 120, emoji: 'ambev_15', sponsor: 'Ambev', type: 'coupon' },
-        { id: 'uni_soap', title: 'Kit Sabao Ecologico Omo', description: 'Desconto de 40% no novo Omo Liquido Ecologico em parceiros.', cost: 60, emoji: 'uni_soap', sponsor: 'Unilever', type: 'coupon' },
         { id: 'decor_bamboo', title: 'Fonte de Arvore de Bambu', description: 'Item virtual para embelezar seu Jardim Ecologico no app.', cost: 50, emoji: 'decor_bamboo', type: 'garden' },
         { id: 'decor_tree', title: 'Ipe Amarelo Premium', description: 'Adicione o magnifico Ipe Amarelo no centro do seu jardim.', cost: 100, emoji: 'decor_tree', type: 'garden' },
         { id: 'decor_solar', title: 'Paineis Solares Virtuais', description: 'Gere energia limpa virtual e aumente o design do seu quintal.', cost: 150, emoji: 'decor_solar', type: 'garden' },
-        { id: 'decor_pond', title: 'Lago de Carpas', description: 'Um belo lago de carpas cristalino para decorar seu Jardim.', cost: 200, emoji: 'decor_pond', type: 'garden' }
+        { id: 'decor_pond', title: 'Lago de Carpas', description: 'Um belo lago de carpas cristalino para decorar seu Jardim.', cost: 200, emoji: 'decor_pond', type: 'garden' },
+        { id: 'decor_pot', title: 'Vaso de Ceramica', description: 'Um belo vaso artesanal para decorar e colocar mudas.', cost: 80, emoji: 'decor_pot', type: 'garden' },
+        { id: 'decor_bird', title: 'Casinha de Passarinhos', description: 'Atrai passarinhos virtuais para o seu Eco-Jardim.', cost: 120, emoji: 'decor_bird', type: 'garden' },
+        { id: 'decor_gnome', title: 'Gnomo de Jardim', description: 'O classico gnomo de jardim para proteger suas plantas.', cost: 90, emoji: 'decor_gnome', type: 'garden' }
     ];
 
     const collectorItems = [
@@ -297,7 +325,7 @@ const EcoStore = ({ user: currentUser, onUpdateUser }) => {
         { id: 'coll_ticket', title: 'Bilhete Sorteio Triciclo Eletrico', description: 'Participe do sorteio mensal de um triciclo eletrico de carga.', cost: 50, emoji: 'coll_ticket', type: 'raffle' }
     ];
 
-    const currentStoreItems = activeTab === 'citizen' ? citizenItems : collectorItems;
+    const currentStoreItems = userRole === 'citizen' ? citizenItems : collectorItems;
 
     return (
         <div style={{ paddingBottom: '100px', backgroundColor: '#f4fbf7', minHeight: '100vh', fontFamily: "'Inter', sans-serif" }}>
@@ -347,53 +375,13 @@ const EcoStore = ({ user: currentUser, onUpdateUser }) => {
                 </div>
             )}
 
-            {/* Tab Bar for Coletor/Cidadao */}
-            <div style={{ display: 'flex', padding: '0 20px', margin: '20px 0 10px 0', gap: '10px' }}>
-                <button
-                    onClick={() => setActiveTab('citizen')}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        background: activeTab === 'citizen' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e6f4ed',
-                        color: activeTab === 'citizen' ? '#fff' : '#047857',
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: activeTab === 'citizen' ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
-                    }}
-                >
-                    Loja do Cidadao
-                </button>
-                <button
-                    onClick={() => setActiveTab('collector')}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        background: activeTab === 'collector' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e6f4ed',
-                        color: activeTab === 'collector' ? '#fff' : '#047857',
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: activeTab === 'collector' ? '0 4px 12px rgba(16, 185, 129, 0.2)' : 'none'
-                    }}
-                >
-                    Loja do Coletor
-                </button>
-            </div>
-
             {/* Sub-text */}
             <div style={{ padding: '0 24px', margin: '15px 0' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#666', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start' }}>
                     <LightbulbIcon />
                     <span>
-                        {activeTab === 'citizen' 
-                            ? 'Use suas GreenCoins ganhas ao reciclar para resgatar cupons de grandes marcas ou decorar o seu Jardim!'
+                        {userRole === 'citizen' 
+                            ? 'Use suas GreenCoins ganhas ao reciclar para decorar o seu Jardim!'
                             : 'Use suas moedas (convertidas de seus ganhos) para impulsionar seu perfil de catador ou obter itens de trabalho!'}
                     </span>
                 </p>

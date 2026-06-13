@@ -189,9 +189,13 @@ export const initDb = async (force = false) => {
                 chat_id INTEGER REFERENCES chats(id),
                 sender_role TEXT,
                 content TEXT,
+                image TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_read INTEGER DEFAULT 0
             )`);
+
+            // Migration: add image column if it doesn't exist
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image TEXT`).catch(() => {});
 
             await client.query('COMMIT');
 

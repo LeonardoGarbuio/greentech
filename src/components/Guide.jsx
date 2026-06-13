@@ -9,9 +9,11 @@ const Guide = ({ onNavigate }) => {
         api.getRecyclingGuide().then(data => setTips(data));
     }, []);
 
+    const normalizeStr = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
     const filteredTips = tips.filter(tip =>
-        tip.title.toLowerCase().includes(filter.toLowerCase()) ||
-        tip.description.toLowerCase().includes(filter.toLowerCase())
+        normalizeStr(tip.title).includes(normalizeStr(filter)) ||
+        normalizeStr(tip.description).includes(normalizeStr(filter))
     );
 
     return (

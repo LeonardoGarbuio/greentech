@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '../services/api';
+import { api, API_BASE_URL } from '../services/api';
 import { signInWithGoogle } from '../services/firebase';
 
 const Login = ({ onLogin, onGoogleLogin }) => {
@@ -47,7 +47,7 @@ const Login = ({ onLogin, onGoogleLogin }) => {
     };
 
     const callBackendAuth = async (googleData, selectedRole = null) => {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/google`, {
+        const response = await fetch(`${API_BASE_URL}/auth/google`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

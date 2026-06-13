@@ -70,27 +70,14 @@ const MapUpdater = ({ items, routeCoordinates, optimizedRoute }) => {
     const hasFittedInitial = useRef(false);
     const prevRouteIdStr = useRef('');
 
-    const routeIdStr = optimizedRoute && optimizedRoute.optimizedRoute 
-        ? optimizedRoute.optimizedRoute.join(',') 
-        : '';
-
     useEffect(() => {
-        if (routeIdStr) {
-            // Only fit bounds if the route items themselves have changed
-            if (routeIdStr !== prevRouteIdStr.current) {
-                if (routeCoordinates && routeCoordinates.length > 0) {
-                    const bounds = L.latLngBounds(routeCoordinates);
-                    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
-                    prevRouteIdStr.current = routeIdStr;
-                }
-            }
-        } else if (items && items.length > 0 && !hasFittedInitial.current) {
-            // Fit bounds only on the initial load of items
+        // Only fit bounds on the initial load of items
+        if (items && items.length > 0 && !hasFittedInitial.current) {
             const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
             map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
             hasFittedInitial.current = true;
         }
-    }, [items, routeCoordinates, routeIdStr, map]);
+    }, [items, map]);
 
     return null;
 };

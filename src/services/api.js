@@ -268,22 +268,6 @@ export const api = {
         return response.json();
     },
 
-    getB2BStats: async () => {
-        const response = await fetch(`${API_BASE_URL}/b2b/stats`);
-        if (!response.ok) throw new Error('Erro ao carregar estatísticas B2B');
-        return response.json();
-    },
-
-    buyRecyclingCredits: async (companyName, weightKg) => {
-        const response = await fetch(`${API_BASE_URL}/b2b/credits`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ companyName, weightKg })
-        });
-        if (!response.ok) throw new Error('Erro ao comprar créditos ESG');
-        return response.json();
-    },
-
     // Atualização especializada para Cooperativa Homologar
     coopHomologateItem: async (itemId, weightCoop) => {
         const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
@@ -340,11 +324,11 @@ export const api = {
         return response.json();
     },
 
-    sendMessage: async (chatId, content) => {
+    sendMessage: async (chatId, content, imageBase64 = null) => {
         const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ content })
+            body: JSON.stringify({ content, image: imageBase64 })
         });
         if (!response.ok) throw new Error('Erro ao enviar mensagem');
         return response.json();

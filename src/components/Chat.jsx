@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 
-const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
+const Chat = ({ onNavigate, user, activeChat, setActiveChat, setIsChatThreadOpen }) => {
     const [chats, setChats] = useState([]);
     const [selectedChatId, setSelectedChatId] = useState(null);
     const [partner, setPartner] = useState(null);
@@ -10,6 +10,8 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
     const [loadingChats, setLoadingChats] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const fileInputRef = useRef(null);
 
     const messagesEndRef = useRef(null);
     const isFirstLoadRef = useRef(true);
@@ -50,6 +52,10 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
 
     // Polling de mensagens em tempo real quando uma conversa está selecionada
     useEffect(() => {
+        if (setIsChatThreadOpen) {
+            setIsChatThreadOpen(!!selectedChatId);
+        }
+
         if (!selectedChatId) {
             setMessages([]);
             return;
@@ -95,14 +101,16 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || sending) return;
+        if ((!newMessage.trim() && !selectedImage) || sending) return;
 
         const messageText = newMessage.trim();
+        const imageToSend = selectedImage;
         setNewMessage('');
+        setSelectedImage(null);
         setSending(true);
 
         try {
-            const res = await api.sendMessage(selectedChatId, messageText);
+            const res = await api.sendMessage(selectedChatId, messageText, imageToSend);
             if (res.success) {
                 // Compensação de latência: Adicionar mensagem localmente de imediato
                 const tempMsg = {
@@ -110,6 +118,7 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                     chat_id: selectedChatId,
                     sender_role: user.role,
                     content: messageText,
+                    image: imageToSend,
                     timestamp: new Date().toISOString()
                 };
                 setMessages(prev => [...prev, tempMsg]);
@@ -118,7 +127,7 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                 setChats(prevChats => 
                     prevChats.map(c => 
                         c.id === selectedChatId 
-                            ? { ...c, last_message: messageText, last_message_time: new Date().toISOString() }
+                            ? { ...c, last_message: imageToSend ? '📷 Imagem' : messageText, last_message_time: new Date().toISOString() }
                             : c
                     )
                 );
@@ -129,6 +138,18 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
         } finally {
             setSending(false);
         }
+    };
+
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSelectedImage(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+        e.target.value = '';
     };
 
     const handleBackToInbox = () => {
@@ -168,17 +189,19 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                 background: '#f8f9fb',
                 fontFamily: '"Be Vietnam Pro", sans-serif'
             }}>
-                <header style={{
-                    padding: '24px 20px',
-                    background: 'white',
-                    borderBottom: '1px solid #eceef0',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 10,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px'
-                }}>
+                <div style={{ padding: '16px' }}>
+                    <header style={{
+                        padding: '20px',
+                        background: 'white',
+                        borderRadius: '24px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        position: 'sticky',
+                        top: '16px',
+                        zIndex: 10
+                    }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h1 style={{
                             fontSize: '1.6rem',
@@ -197,6 +220,7 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                         Converse com {user.role === 'producer' ? 'os catadores parceiros' : 'os doadores'} para combinar a retirada dos materiais recicláveis.
                     </p>
                 </header>
+            </div>
 
                 <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {loadingChats ? (
@@ -364,32 +388,33 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
             bottom: 0,
             zIndex: 1000
         }}>
-            {/* Header do Chat */}
-            <header style={{
-                padding: '12px 16px',
-                background: 'white',
-                borderBottom: '1px solid #eceef0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                flexShrink: 0,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-            }}>
+            <div style={{ padding: '16px' }}>
+                {/* Header do Chat */}
+                <header style={{
+                    padding: '12px 16px',
+                    background: 'white',
+                    borderRadius: '24px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexShrink: 0
+                }}>
                 <button 
                     onClick={handleBackToInbox}
                     style={{
-                        background: 'transparent',
+                        background: '#f2f4f6',
                         border: 'none',
                         color: '#4b6076',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '6px',
                         borderRadius: '50%'
                     }}
                 >
-                    <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>arrow_back</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back</span>
                 </button>
 
                 {/* Avatar do Parceiro */}
@@ -462,6 +487,7 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                     </a>
                 )}
             </header>
+            </div>
 
             {/* Corpo das Mensagens */}
             <div style={{
@@ -521,6 +547,19 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                                         wordBreak: 'break-word',
                                         border: isMe ? 'none' : '1px solid #eceef0'
                                     }}>
+                                        {msg.image && (
+                                            <img 
+                                                src={msg.image} 
+                                                alt="Anexo" 
+                                                style={{ 
+                                                    width: '100%', 
+                                                    maxHeight: '200px', 
+                                                    objectFit: 'cover', 
+                                                    borderRadius: '8px',
+                                                    marginBottom: msg.content ? '8px' : '0'
+                                                }} 
+                                            />
+                                        )}
                                         {msg.content}
                                     </div>
                                     {/* Horário */}
@@ -541,6 +580,22 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                 <div ref={messagesEndRef} />
             </div>
 
+            {/* Image Preview Area */}
+            {selectedImage && (
+                <div style={{ padding: '8px 16px', background: '#f8f9fb', borderTop: '1px solid #eceef0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <img src={selectedImage} alt="Preview" style={{ height: '60px', borderRadius: '8px', border: '2px solid #27ae60' }} />
+                        <button 
+                            type="button"
+                            onClick={() => setSelectedImage(null)}
+                            style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Input de Envio inferior */}
             <form 
                 onSubmit={handleSendMessage}
@@ -554,6 +609,21 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                     flexShrink: 0
                 }}
             >
+                <button 
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ background: '#f2f4f6', border: 'none', color: '#4b6076', cursor: 'pointer', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>attach_file</span>
+                </button>
+                <input 
+                    type="file" 
+                    accept="image/*" 
+                    ref={fileInputRef} 
+                    style={{ display: 'none' }} 
+                    onChange={handleImageUpload} 
+                />
+                
                 <input 
                     type="text"
                     value={newMessage}
@@ -583,20 +653,20 @@ const Chat = ({ onNavigate, user, activeChat, setActiveChat }) => {
                 
                 <button 
                     type="submit"
-                    disabled={!newMessage.trim() || sending}
+                    disabled={(!newMessage.trim() && !selectedImage) || sending}
                     style={{
                         width: '46px',
                         height: '46px',
                         borderRadius: '50%',
-                        background: newMessage.trim() ? '#27ae60' : '#eceef0',
-                        color: newMessage.trim() ? 'white' : '#bccabc',
+                        background: (newMessage.trim() || selectedImage) ? '#27ae60' : '#eceef0',
+                        color: (newMessage.trim() || selectedImage) ? 'white' : '#bccabc',
                         border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        cursor: newMessage.trim() ? 'pointer' : 'default',
+                        cursor: (newMessage.trim() || selectedImage) ? 'pointer' : 'not-allowed',
                         transition: 'all 0.2s ease',
-                        boxShadow: newMessage.trim() ? '0 4px 12px rgba(39, 174, 96, 0.2)' : 'none'
+                        boxShadow: (newMessage.trim() || selectedImage) ? '0 4px 12px rgba(39, 174, 96, 0.3)' : 'none'
                     }}
                 >
                     {sending ? (

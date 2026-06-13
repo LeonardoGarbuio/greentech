@@ -8,15 +8,6 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
     const [notifications, setNotifications] = useState([]);
     const [addresses, setAddresses] = useState([]);
     const [loadingError, setLoadingError] = useState(false);
-    const [isB2BMode, setIsB2BMode] = useState(() => {
-        return localStorage.getItem('greentech_b2b_mode') === 'true';
-    });
-
-    const toggleB2BMode = () => {
-        const newValue = !isB2BMode;
-        setIsB2BMode(newValue);
-        localStorage.setItem('greentech_b2b_mode', String(newValue));
-    };
 
     // Timeout effect to detect stuck loading
     useEffect(() => {
@@ -317,106 +308,6 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Reciclados</p>
                     </div>
                 </div>
-
-                {/* B2B Corporate Toggle Panel */}
-                {currentUser?.role === 'producer' && (
-                    <div style={{
-                        marginBottom: '20px',
-                        padding: '16px 20px',
-                        background: 'rgba(255, 255, 255, 0.6)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '16px',
-                        border: '1px solid rgba(16, 185, 129, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '10px',
-                                background: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                            </div>
-                            <div>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>Visualização Corporativa</span>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b' }}>Auditor ESG / Empresa</span>
-                            </div>
-                        </div>
-                        <div
-                            onClick={toggleB2BMode}
-                            style={{
-                                width: '50px',
-                                height: '28px',
-                                borderRadius: '14px',
-                                background: isB2BMode ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e2e8f0',
-                                cursor: 'pointer',
-                                position: 'relative',
-                                transition: 'background 0.3s ease',
-                                boxShadow: isB2BMode ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'inset 0 1px 3px rgba(0,0,0,0.1)'
-                            }}
-                        >
-                            <div style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '50%',
-                                background: 'white',
-                                position: 'absolute',
-                                top: '3px',
-                                left: isB2BMode ? '25px' : '3px',
-                                transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
-                            }} />
-                        </div>
-                    </div>
-                )}
-
-                {/* Enterprise Portal Shortcut Button - Conditional on B2B mode */}
-                {currentUser?.role === 'producer' && isB2BMode && (
-                    <button 
-                        onClick={() => onNavigate('b2b')}
-                        style={{
-                            marginBottom: '20px',
-                            width: '100%',
-                            padding: '16px',
-                            background: 'rgba(51, 65, 85, 0.05)',
-                            backdropFilter: 'blur(10px)',
-                            border: '1.5px dashed rgba(16, 185, 129, 0.5)',
-                            color: '#334155',
-                            borderRadius: 'var(--radius-md)',
-                            fontWeight: '700',
-                            fontSize: '0.9rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-                            letterSpacing: '0.5px',
-                            fontFamily: "'Outfit', sans-serif",
-                            transition: 'all 0.3s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
-                            e.currentTarget.style.borderColor = '#10b981';
-                            e.currentTarget.style.color = '#047857';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(51, 65, 85, 0.05)';
-                            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)';
-                            e.currentTarget.style.color = '#334155';
-                        }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                        PORTAL B2B / ESG ENTERPRISE
-                    </button>
-                )}
 
                 {/* Meu Eco-Jardim Shortcut Button */}
                 <button 

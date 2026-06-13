@@ -14,7 +14,6 @@ import Leaderboard from './components/Leaderboard';
 import Guide from './components/Guide';
 import History from './components/History';
 import EcoStore from './components/EcoStore';
-import B2BDashboard from './components/B2BDashboard';
 import { api } from './services/api';
 
 const App = () => {
@@ -26,6 +25,7 @@ const App = () => {
   const [feedItems, setFeedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeChat, setActiveChat] = useState(null);
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
 
   // Restaurar sessão de VERDADE via banco de dados
   React.useEffect(() => {
@@ -246,7 +246,7 @@ const App = () => {
       case 'profile':
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} user={user} />;
       case 'chat':
-        return <Chat onNavigate={handleNavigate} user={user} activeChat={activeChat} setActiveChat={setActiveChat} />;
+        return <Chat onNavigate={handleNavigate} user={user} activeChat={activeChat} setActiveChat={setActiveChat} setIsChatThreadOpen={setIsChatThreadOpen} />;
       case 'map':
         return <Map onNavigate={handleNavigate} />;
       case 'garden':
@@ -257,8 +257,6 @@ const App = () => {
         return <Guide onNavigate={handleNavigate} />;
       case 'store':
         return <EcoStore user={user} onUpdateUser={() => {}} />;
-      case 'b2b':
-        return <B2BDashboard onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} user={user} />;
     }
@@ -268,8 +266,8 @@ const App = () => {
     <div className="app-shell">
       {renderScreen()}
 
-      {/* Persistent Bottom Navigation (except on Post Item) */}
-      {currentView !== 'post-item' && (
+      {/* Persistent Bottom Navigation */}
+      {currentView !== 'post-item' && !(currentView === 'chat' && isChatThreadOpen) && (
         <BottomNavigation
           currentView={currentView}
           onNavigate={handleNavigate}

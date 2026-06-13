@@ -55,9 +55,29 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
             // Weight Filter
             if (i.weight_kg < filterWeight) return false;
 
+            // Dynamic Radius Logic (Only for Collectors)
+            if (userRole === 'collector' && userCoords && i.lat && (i.lng || i.lon)) {
+                if (i.status === 'available') {
+                    const now = new Date();
+                    const itemTime = new Date(i.created_at || i.collected_at || now);
+                    const diffMins = (now - itemTime) / 60000;
+                    
+                    const lng = i.lng || i.lon;
+                    const distMeters = getDistanceInMeters(userCoords.lat, userCoords.lng, i.lat, lng);
+                    
+                    if (diffMins <= 15) {
+                        if (distMeters > 10000) return false; // 10km
+                    } else if (diffMins <= 30) {
+                        if (distMeters > 20000) return false; // 20km
+                    } else {
+                        if (distMeters > 50000) return false; // 50km
+                    }
+                }
+            }
+
             return true;
         });
-    }, [items, activeCategory, filterWeight]);
+    }, [items, activeCategory, filterWeight, userRole, userCoords]);
 
     // Monitor geolocation in real time
     useEffect(() => {
@@ -109,7 +129,10 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
     // Automatically optimize route
     useEffect(() => {
         if (userRole !== 'collector' || !userCoords) return;
-        if (filteredItems.length === 0) {
+        
+        const reservedItems = filteredItems.filter(i => i.status === 'reserved' && i.collector_id === currentUserId);
+
+        if (reservedItems.length === 0) {
             setOptimizedRoute(null);
             return;
         }
@@ -117,11 +140,11 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
         const autoOptimize = async () => {
             setIsOptimizing(true);
             try {
-                console.log("Auto-optimizing route for collector...", userCoords, filteredItems.length);
+                console.log("Auto-optimizing route for collector...", userCoords, reservedItems.length);
                 const result = await api.optimizeRoute(
                     currentUserId,
                     userCoords,
-                    filteredItems
+                    reservedItems
                 );
                 if (result.success) {
                     setOptimizedRoute(result);

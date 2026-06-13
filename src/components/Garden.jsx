@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
+import { getItemSVG } from './EcoStore';
 
 /* ═══════════════════════════════════════════════════════════════
    ECO-JARDIM — Interactive Farming Mini-Game
@@ -38,6 +39,7 @@ const saveGame = (userId, data) => {
 };
 
 const getPlotStage = (plot, now) => {
+  if (plot.state === 'decor') return 'decor';
   if (plot.state === 'empty') return 'empty';
   const elapsed = now - plot.plantedAt - (plot.waterBonus || 0);
   if (elapsed < STAGE_DURATIONS.planted) return 'planted';
@@ -323,7 +325,8 @@ const LeafIcon = () => (
    PLANT MODAL COMPONENT
    ═══════════════════════════════════════════════════ */
 
-const PlantModal = ({ onClose, onPlant, balance }) => {
+const PlantModal = ({ onClose, onPlant, onDecorate, balance, decorations }) => {
+  const [tab, setTab] = useState('seeds');
   const types = Object.entries(PLANT_TYPES);
   return (
     <div style={{
@@ -335,58 +338,119 @@ const PlantModal = ({ onClose, onPlant, balance }) => {
       <div style={{
         background: '#fff', borderRadius: '20px', padding: '28px',
         maxWidth: '340px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        animation: 'modalIn 0.3s ease-out'
+        animation: 'modalIn 0.3s ease-out', display: 'flex', flexDirection: 'column',
+        maxHeight: '80vh'
       }} onClick={e => e.stopPropagation()}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#2E7D32', fontWeight: 800 }}>
-          🌱 Plantar Semente
-        </h3>
-        <p style={{ margin: '0 0 18px', color: '#666', fontSize: '0.82rem' }}>
-          Escolha o que deseja plantar. Saldo: <strong style={{ color: '#F9A825' }}>{balance} GC</strong>
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {types.map(([key, info]) => {
-            const canAfford = balance >= info.cost;
-            return (
-              <button key={key} disabled={!canAfford}
-                onClick={() => canAfford && onPlant(key)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '14px 16px', border: canAfford ? `2px solid ${info.color}` : '2px solid #ddd',
-                  borderRadius: '14px', cursor: canAfford ? 'pointer' : 'not-allowed',
-                  background: canAfford ? `${info.color}10` : '#f5f5f5',
-                  opacity: canAfford ? 1 : 0.5, transition: 'all 0.2s',
-                  fontFamily: "'Inter', sans-serif"
-                }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '36px', height: '36px', borderRadius: '10px',
-                    background: info.color, display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', color: '#fff', fontSize: '1.1rem', fontWeight: '700'
-                  }}>
-                    {key === 'basic' ? '🥬' : key === 'flower' ? '🌸' : '🌳'}
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#333' }}>{info.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                      Lucro: +{info.reward - info.cost} GC
-                    </div>
-                  </div>
-                </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  fontWeight: 700, fontSize: '0.95rem', color: canAfford ? info.color : '#999'
-                }}>
-                  <CoinIcon size={16} /> {info.cost}
-                </div>
-              </button>
-            );
-          })}
+        
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+            <button 
+                onClick={() => setTab('seeds')}
+                style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '10px', background: tab === 'seeds' ? '#E8F5E9' : '#f5f5f5', color: tab === 'seeds' ? '#2E7D32' : '#666', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+                Sementes
+            </button>
+            <button 
+                onClick={() => setTab('decor')}
+                style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '10px', background: tab === 'decor' ? '#E8F5E9' : '#f5f5f5', color: tab === 'decor' ? '#2E7D32' : '#666', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+                Decorações
+            </button>
         </div>
+
+        {tab === 'seeds' ? (
+            <>
+                <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#2E7D32', fontWeight: 800 }}>
+                  🌱 Plantar Semente
+                </h3>
+                <p style={{ margin: '0 0 18px', color: '#666', fontSize: '0.82rem' }}>
+                  Escolha o que deseja plantar. Saldo: <strong style={{ color: '#F9A825' }}>{balance} GC</strong>
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {types.map(([key, info]) => {
+                    const canAfford = balance >= info.cost;
+                    return (
+                      <button key={key} disabled={!canAfford}
+                        onClick={() => canAfford && onPlant(key)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '14px 16px', border: canAfford ? `2px solid ${info.color}` : '2px solid #ddd',
+                          borderRadius: '14px', cursor: canAfford ? 'pointer' : 'not-allowed',
+                          background: canAfford ? `${info.color}10` : '#f5f5f5',
+                          opacity: canAfford ? 1 : 0.5, transition: 'all 0.2s',
+                          fontFamily: "'Inter', sans-serif"
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '36px', height: '36px', borderRadius: '10px',
+                            background: info.color, display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', color: '#fff', fontSize: '1.1rem', fontWeight: '700'
+                          }}>
+                            {key === 'basic' ? '🥬' : key === 'flower' ? '🌸' : '🌳'}
+                          </div>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#333' }}>{info.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                              Lucro: +{info.reward - info.cost} GC
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          fontWeight: 700, fontSize: '0.95rem', color: canAfford ? info.color : '#999'
+                        }}>
+                          <CoinIcon size={16} /> {info.cost}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+            </>
+        ) : (
+            <>
+                <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#2E7D32', fontWeight: 800 }}>
+                  🏡 Decorações
+                </h3>
+                <p style={{ margin: '0 0 18px', color: '#666', fontSize: '0.82rem' }}>
+                  Seus itens comprados na Loja.
+                </p>
+                {decorations.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#888', padding: '20px 0', fontSize: '0.9rem' }}>
+                        Você não possui decorações. Compre na EcoStore!
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', paddingRight: '4px' }}>
+                      {decorations.map((item, idx) => (
+                        <button key={idx}
+                          onClick={() => onDecorate(item.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '12px', border: '2px solid #ddd',
+                            borderRadius: '14px', cursor: 'pointer',
+                            background: '#fcfcfc', transition: 'all 0.2s',
+                            fontFamily: "'Inter', sans-serif", textAlign: 'left'
+                          }}>
+                           <div style={{ 
+                               width: '42px', height: '42px', borderRadius: '10px', 
+                               background: '#f0fdf4', display: 'flex', 
+                               justifyContent: 'center', alignItems: 'center', flexShrink: 0 
+                            }}>
+                               {getItemSVG(item.id)}
+                           </div>
+                           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#333' }}>
+                               {item.label}
+                           </div>
+                        </button>
+                      ))}
+                    </div>
+                )}
+            </>
+        )}
         <button onClick={onClose} style={{
-          marginTop: '16px', width: '100%', padding: '10px',
-          border: 'none', borderRadius: '10px', background: '#eee',
-          color: '#666', fontWeight: 600, cursor: 'pointer',
-          fontFamily: "'Inter', sans-serif", fontSize: '0.9rem'
+          marginTop: '16px', width: '100%', padding: '12px',
+          border: 'none', borderRadius: '12px', background: '#eee',
+          color: '#666', fontWeight: 700, cursor: 'pointer',
+          fontFamily: "'Inter', sans-serif", fontSize: '0.95rem'
         }}>
           Cancelar
         </button>
@@ -526,6 +590,7 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
   const [grid, setGrid] = useState(createEmptyGrid());
   const [balance, setBalance] = useState(0);
   const [totalHarvests, setTotalHarvests] = useState(0);
+  const [decorations, setDecorations] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [harvestPopup, setHarvestPopup] = useState(null);
@@ -563,6 +628,8 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
             setShowTutorial(true);
             setTutorialStep(0);
           }
+          const savedDecor = JSON.parse(localStorage.getItem(`garden_decorations_${targetId}`) || '[]');
+          setDecorations(savedDecor);
           setLoading(false);
         });
       })
@@ -579,6 +646,8 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
             setShowTutorial(true);
             setTutorialStep(0);
           }
+          const savedDecor = JSON.parse(localStorage.getItem(`garden_decorations_${targetId}`) || '[]');
+          setDecorations(savedDecor);
           setLoading(false);
         }
       });
@@ -626,6 +695,16 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
     if (stage === 'empty') {
       setSelectedPlot(index);
       setShowModal(true);
+      return;
+    }
+
+    if (stage === 'decor') {
+      // Remove decoration
+      setGrid(g => {
+        const ng = [...g];
+        ng[index] = { state: 'empty' };
+        return ng;
+      });
       return;
     }
 
@@ -688,6 +767,21 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
     setSelectedPlot(null);
   }, [selectedPlot, balance, currentUser]);
 
+  const handleDecorate = useCallback((decorId) => {
+    if (selectedPlot === null) return;
+    setGrid(g => {
+      const ng = [...g];
+      ng[selectedPlot] = {
+        state: 'decor',
+        type: decorId,
+        plantedAt: Date.now(),
+      };
+      return ng;
+    });
+    setShowModal(false);
+    setSelectedPlot(null);
+  }, [selectedPlot]);
+
   /* ── Computed stats ── */
   const plantedCount = grid.filter(p => p.state !== 'empty').length;
 
@@ -719,6 +813,18 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
 
   /* ── Get the right SVG for a plot ── */
   const getPlotVisual = (plot, stage) => {
+    if (stage === 'decor') {
+        return (
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                <SoilSVG />
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                    <div style={{ transform: 'scale(1.4)' }}>
+                        {getItemSVG(plot.type)}
+                    </div>
+                </div>
+            </div>
+        );
+    }
     if (stage === 'empty') return <SoilSVG />;
     if (stage === 'planted') return <SeedSVG type={plot.type} />;
     if (stage === 'growing') return <SproutSVG type={plot.type} />;
@@ -731,7 +837,8 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
   };
 
   const getPlotTooltip = (plot, stage) => {
-    if (stage === 'empty') return 'Clique para plantar';
+    if (stage === 'decor') return 'Clique para remover a decoração';
+    if (stage === 'empty') return 'Clique para plantar ou decorar';
     const info = PLANT_TYPES[plot.type];
     if (stage === 'harvestable') return `${info.name} pronta! Clique para colher (+${info.reward} GC)`;
     const wateredStages = plot.wateredStages || [];
@@ -1031,6 +1138,7 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
                 const progress = getPlotProgress(plot, stage);
                 const canInteract = !viewOnly && (
                   stage === 'empty' ||
+                  stage === 'decor' ||
                   stage === 'harvestable' ||
                   (stage !== 'empty' && !(plot.wateredStages || []).includes(stage))
                 );
@@ -1124,7 +1232,9 @@ const Garden = ({ user: currentUser, viewOnly = false, userId }) => {
         <PlantModal
           onClose={() => { setShowModal(false); setSelectedPlot(null); }}
           onPlant={handlePlant}
+          onDecorate={handleDecorate}
           balance={balance}
+          decorations={decorations}
         />
       )}
 

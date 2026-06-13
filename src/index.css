@@ -66,6 +66,14 @@ button:active {
   transform: scale(0.96);
 }
 
+/* Override default blue focus rings from Tailwind Forms */
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary-color) !important;
+  --tw-ring-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 1px var(--primary-color) !important;
+  outline: none !important;
+}
+
 /* Utilities */
 .glass-panel {
   background: var(--surface-color);

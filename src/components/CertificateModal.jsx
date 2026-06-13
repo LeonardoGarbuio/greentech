@@ -283,7 +283,7 @@ const CertificateModal = ({ itemId, onClose }) => {
                     </div>
 
                     <button 
-                        onClick={() => alert("Certificado gerado com sucesso! Arquivo PDF simulado e pronto para arquivamento B2B.")}
+                        onClick={() => alert("Certificado gerado com sucesso! Arquivo PDF simulado e pronto para arquivamento.")}
                         style={{
                             padding: '10px 20px',
                             borderRadius: '12px',

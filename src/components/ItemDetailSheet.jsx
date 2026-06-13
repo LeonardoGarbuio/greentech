@@ -6,7 +6,10 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
     const [isVisible, setIsVisible] = useState(false);
     const [showScheduleInput, setShowScheduleInput] = useState(false);
     const [scheduleTime, setScheduleTime] = useState('');
+    const [customTime, setCustomTime] = useState('');
     const [showGarden, setShowGarden] = useState(false);
+    const [startY, setStartY] = useState(null);
+    const [dragOffset, setDragOffset] = useState(0);
 
     useEffect(() => {
         if (item) {
@@ -36,7 +39,7 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                     width: '100%',
                     height: '100%',
                     background: 'rgba(0,0,0,0.5)',
-                    zIndex: 100,
+                    zIndex: 1001,
                     opacity: isVisible ? 1 : 0,
                     transition: 'opacity 0.3s',
                     pointerEvents: isVisible ? 'auto' : 'none'
@@ -53,21 +56,46 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                 borderTopLeftRadius: '32px',
                 borderTopRightRadius: '32px',
                 padding: '24px',
-                zIndex: 101,
-                transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
-                transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                zIndex: 1002,
+                transform: isVisible ? `translateY(${dragOffset}px)` : 'translateY(100%)',
+                transition: dragOffset > 0 ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
                 boxShadow: '0 -10px 40px rgba(0,0,0,0.1)',
                 maxHeight: '90vh',
                 overflowY: 'auto'
             }}>
-                {/* Drag Handle */}
-                <div style={{
-                    width: '40px',
-                    height: '4px',
-                    background: '#e0e0e0',
-                    borderRadius: '2px',
-                    margin: '0 auto 24px auto'
-                }} />
+                {/* Drag Handle Area */}
+                <div 
+                    onClick={onClose}
+                    onTouchStart={(e) => setStartY(e.touches[0].clientY)}
+                    onTouchMove={(e) => {
+                        if (!startY) return;
+                        const currentY = e.touches[0].clientY;
+                        const offset = Math.max(0, currentY - startY); // Only allow dragging down
+                        setDragOffset(offset);
+                    }}
+                    onTouchEnd={() => {
+                        if (dragOffset > 150) { // Threshold to close
+                            onClose();
+                        }
+                        setDragOffset(0);
+                        setStartY(null);
+                    }}
+                    style={{
+                        padding: '24px 0',
+                        margin: '-24px -24px 12px -24px',
+                        cursor: 'grab',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        background: 'transparent'
+                    }}
+                >
+                    <div style={{
+                        width: '40px',
+                        height: '4px',
+                        background: '#ccc',
+                        borderRadius: '2px',
+                    }} />
+                </div>
 
                 {/* Profile Section - Only show if NOT owner */}
                 {!isOwner && (
@@ -265,22 +293,40 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                 {/* Contact Buttons - Hide if owner */}
                 {!isOwner && (
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
-                        <button style={{
-                            flex: 1,
-                            background: '#25D366',
-                            color: 'white',
-                            border: 'none',
-                            padding: '14px',
-                            borderRadius: '16px',
-                            fontWeight: '700',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            fontSize: '1rem',
-                            cursor: 'pointer'
-                        }}>
-                            <span>💬</span> WhatsApp
+                        <button 
+                            onClick={async () => {
+                                try {
+                                    const chatRes = await api.getOrCreateChat(item.producer_id, currentUserId);
+                                    if (chatRes.success) {
+                                        onClose();
+                                        onNavigate('chat', {
+                                            chatId: chatRes.chat.id,
+                                            producerId: item.producer_id,
+                                            collectorId: currentUserId,
+                                            partnerName: item.producer_name || 'Doador'
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error("Erro ao iniciar chat:", error);
+                                    alert("Não foi possível iniciar o chat.");
+                                }
+                            }}
+                            style={{
+                                flex: 1,
+                                background: 'var(--primary-color)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '14px',
+                                borderRadius: '16px',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                fontSize: '1rem',
+                                cursor: 'pointer'
+                            }}>
+                            <span>💬</span> Mensagem
                         </button>
                         <button style={{
                             flex: 1,
@@ -464,35 +510,78 @@ const ItemDetailSheet = ({ item, onClose, onAccept, onDelete, currentUserId, use
                     ) : (
                         // Available -> Schedule Collection
                         showScheduleInput ? (
-                            <div style={{ marginTop: '16px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Quando você pode buscar?</label>
-                                <input
-                                    type="datetime-local"
-                                    value={scheduleTime}
-                                    onChange={(e) => setScheduleTime(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '12px',
-                                        borderRadius: '12px',
-                                        border: '1px solid #ddd',
-                                        marginBottom: '12px'
-                                    }}
-                                />
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ marginTop: '16px', background: '#f8f9fa', padding: '16px', borderRadius: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '16px', fontWeight: '700', color: '#2c3e50', textAlign: 'center' }}>Em quanto tempo você chega?</label>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: scheduleTime === 'custom' ? '12px' : '20px' }}>
+                                    {[
+                                        { label: 'Em 15 min', val: 'Em ~15 min', icon: '⚡' },
+                                        { label: 'Em 30 min', val: 'Em ~30 min', icon: '🚗' },
+                                        { label: 'Em 1 hora', val: 'Em ~1 hora', icon: '⏳' },
+                                        { label: 'Personalizado', val: 'custom', icon: '⏱️' },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.val}
+                                            onClick={() => setScheduleTime(opt.val)}
+                                            style={{
+                                                padding: '12px 8px',
+                                                background: scheduleTime === opt.val ? 'var(--primary-color)' : 'white',
+                                                color: scheduleTime === opt.val ? 'white' : 'var(--text-primary)',
+                                                border: `2px solid ${scheduleTime === opt.val ? 'var(--primary-color)' : '#e0e0e0'}`,
+                                                borderRadius: '12px',
+                                                fontWeight: '700',
+                                                fontSize: '0.9rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.2s',
+                                                boxShadow: scheduleTime === opt.val ? '0 4px 12px var(--primary-glow)' : 'none'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '1.4rem' }}>{opt.icon}</span>
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {scheduleTime === 'custom' && (
+                                    <div style={{ marginBottom: '20px', animation: 'fadeIn 0.2s ease-out' }}>
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Chego às 15:30"
+                                            value={customTime}
+                                            onChange={(e) => setCustomTime(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '14px',
+                                                borderRadius: '12px',
+                                                border: '2px solid var(--primary-color)',
+                                                outline: 'none',
+                                                fontSize: '0.95rem',
+                                                fontWeight: '500'
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '12px' }}>
                                     <button
                                         onClick={() => setShowScheduleInput(false)}
-                                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eee' }}
+                                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: '#e0e0e0', fontWeight: '700', color: '#4b6076', cursor: 'pointer' }}
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         onClick={() => {
-                                            if (!scheduleTime) return alert('Escolha um horário!');
-                                            onAccept(item.id, 'reserved', scheduleTime);
+                                            const finalTime = scheduleTime === 'custom' ? customTime.trim() : scheduleTime;
+                                            if (!finalTime) return alert('Escolha ou digite um tempo estimado!');
+                                            onAccept(item.id, 'reserved', finalTime);
                                             onClose();
                                         }}
-                                        className="btn-primary"
-                                        style={{ flex: 1, padding: '12px', borderRadius: '12px' }}
+                                        style={{ flex: 1, padding: '14px', borderRadius: '12px', border: 'none', background: 'var(--primary-color)', fontWeight: '700', color: 'white', cursor: 'pointer', opacity: (scheduleTime && scheduleTime !== 'custom') || (scheduleTime === 'custom' && customTime.trim()) ? 1 : 0.5 }}
+                                        disabled={!scheduleTime || (scheduleTime === 'custom' && !customTime.trim())}
                                     >
                                         Confirmar
                                     </button>

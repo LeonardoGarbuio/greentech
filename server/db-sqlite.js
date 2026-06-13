@@ -143,10 +143,16 @@ function initDb(db) {
             chat_id INTEGER,
             sender_role TEXT,
             content TEXT,
+            image TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             is_read INTEGER DEFAULT 0,
             FOREIGN KEY(chat_id) REFERENCES chats(id)
         )`);
+
+        // Migration: add image column if it doesn't exist
+        db.run(`ALTER TABLE messages ADD COLUMN image TEXT`, (err) => {
+            // Ignore error if column already exists
+        });
 
         // --- B2B & BLOCK-LOG DE RASTREABILIDADE CRIPTOGRÁFICA ---
         db.run(`CREATE TABLE IF NOT EXISTS traceability_ledger (
