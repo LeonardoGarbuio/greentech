@@ -136,6 +136,20 @@ export const initDb = async (force = false) => {
                 onboarding_completed INTEGER DEFAULT 0
             )`);
 
+            await client.query(`CREATE TABLE IF NOT EXISTS cooperatives (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE,
+                password TEXT,
+                name TEXT,
+                phone TEXT,
+                cnpj TEXT,
+                address TEXT,
+                total_received_kg REAL DEFAULT 0,
+                homologations_count INTEGER DEFAULT 0,
+                avatar_url TEXT,
+                onboarding_completed INTEGER DEFAULT 0
+            )`);
+
             // Migração: adicionar coluna se tabela já existir
             await client.query(`ALTER TABLE collectors ADD COLUMN IF NOT EXISTS onboarding_completed INTEGER DEFAULT 0`).catch(() => {});
 
@@ -172,8 +186,20 @@ export const initDb = async (force = false) => {
                 lng REAL,
                 address TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                collected_at TIMESTAMP
+                collected_at TIMESTAMP,
+                cooperative_id INTEGER REFERENCES cooperatives(id),
+                homologated_weight_kg REAL,
+                homologated_type TEXT,
+                final_destination TEXT,
+                receipt_number TEXT,
+                homologated_at TIMESTAMP
             )`);
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS cooperative_id INTEGER REFERENCES cooperatives(id)`).catch(() => {});
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS homologated_weight_kg REAL`).catch(() => {});
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS homologated_type TEXT`).catch(() => {});
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS final_destination TEXT`).catch(() => {});
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS receipt_number TEXT`).catch(() => {});
+            await client.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS homologated_at TIMESTAMP`).catch(() => {});
 
             // Chats & Messages
             await client.query(`CREATE TABLE IF NOT EXISTS chats (
@@ -196,6 +222,35 @@ export const initDb = async (force = false) => {
 
             // Migration: add image column if it doesn't exist
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS image TEXT`).catch(() => {});
+
+            // Cadeia de custódia do resíduo, usada pelo Passaporte Circular.
+            await client.query(`CREATE TABLE IF NOT EXISTS traceability_ledger (
+                id SERIAL PRIMARY KEY,
+                item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+                step TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                actor_id INTEGER,
+                actor_role TEXT,
+                payload TEXT,
+                previous_hash TEXT NOT NULL,
+                current_hash TEXT NOT NULL
+            )`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_traceability_item ON traceability_ledger(item_id, id)`);
+
+            await client.query(`CREATE TABLE IF NOT EXISTS b2b_credits (
+                id SERIAL PRIMARY KEY,
+                company_name TEXT NOT NULL,
+                weight_kg REAL NOT NULL,
+                amount_paid REAL NOT NULL,
+                certificate_uuid TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`);
+
+            await client.query(`INSERT INTO cooperatives
+                (email, password, name, phone, cnpj, address, onboarding_completed)
+                VALUES ('cooperative@test.com', 'password', 'Cooperativa GreenTech PG', '(42) 3222-1206',
+                '08.018.008/0001-97', 'Ponta Grossa - PR', 1)
+                ON CONFLICT (email) DO NOTHING`);
 
             await client.query('COMMIT');
 

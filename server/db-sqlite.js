@@ -83,9 +83,25 @@ function initDb(db) {
             onboarding_completed INTEGER DEFAULT 0
         )`);
 
+        // --- COOPERATIVE TABLES ---
+        db.run(`CREATE TABLE IF NOT EXISTS cooperatives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password TEXT,
+            name TEXT,
+            phone TEXT,
+            cnpj TEXT,
+            address TEXT,
+            total_received_kg REAL DEFAULT 0,
+            homologations_count INTEGER DEFAULT 0,
+            avatar_url TEXT,
+            onboarding_completed INTEGER DEFAULT 0
+        )`);
+
         // Migração: adicionar coluna se tabela já existir
         db.run(`ALTER TABLE producers ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
         db.run(`ALTER TABLE collectors ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
+        db.run(`ALTER TABLE cooperatives ADD COLUMN onboarding_completed INTEGER DEFAULT 0`, () => {});
 
         db.run(`CREATE TABLE IF NOT EXISTS collector_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,9 +139,23 @@ function initDb(db) {
             address TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             collected_at DATETIME,
+            cooperative_id INTEGER,
+            homologated_weight_kg REAL,
+            homologated_type TEXT,
+            final_destination TEXT,
+            receipt_number TEXT,
+            homologated_at DATETIME,
             FOREIGN KEY(producer_id) REFERENCES producers(id),
-            FOREIGN KEY(collector_id) REFERENCES collectors(id)
+            FOREIGN KEY(collector_id) REFERENCES collectors(id),
+            FOREIGN KEY(cooperative_id) REFERENCES cooperatives(id)
         )`);
+
+        db.run(`ALTER TABLE items ADD COLUMN cooperative_id INTEGER`, () => {});
+        db.run(`ALTER TABLE items ADD COLUMN homologated_weight_kg REAL`, () => {});
+        db.run(`ALTER TABLE items ADD COLUMN homologated_type TEXT`, () => {});
+        db.run(`ALTER TABLE items ADD COLUMN final_destination TEXT`, () => {});
+        db.run(`ALTER TABLE items ADD COLUMN receipt_number TEXT`, () => {});
+        db.run(`ALTER TABLE items ADD COLUMN homologated_at DATETIME`, () => {});
 
         // --- CHAT SYSTEM ---
         db.run(`CREATE TABLE IF NOT EXISTS chats (
@@ -182,6 +212,11 @@ function initDb(db) {
 }
 
 function seedData(db) {
+    db.run(`INSERT OR IGNORE INTO cooperatives
+        (email, password, name, phone, cnpj, address, onboarding_completed)
+        VALUES ('cooperative@test.com', 'password', 'Cooperativa GreenTech PG', '(42) 3222-1206',
+        '08.018.008/0001-97', 'Ponta Grossa - PR', 1)`);
+
     db.get("SELECT count(*) as count FROM producers", [], (err, row) => {
         if (!err && row && row.count === 0) {
             console.log("Seeding V3 Data...");

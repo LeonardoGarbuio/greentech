@@ -225,7 +225,7 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
 
     const getModalTitle = () => {
         switch (activeModal) {
-            case 'edit': return 'Editar Perfil';
+            case 'edit': return currentUser?.role === 'cooperative' ? 'Editar Dados da Unidade' : 'Editar Perfil';
             case 'notifications': return 'Notificações';
             case 'addresses': return 'Meus Endereços';
             case 'help': return 'Ajuda & Suporte';
@@ -255,6 +255,22 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
             </div>
         );
     }
+
+    const profileMenuItems = currentUser?.role === 'cooperative'
+        ? [
+            { id: 'edit', label: 'Editar Dados da Unidade' },
+            { id: 'help', label: 'Ajuda' },
+            { id: 'privacy', label: 'Política de Privacidade' },
+            { id: 'delete_account', label: 'Excluir Conta da Unidade', style: { color: '#e74c3c' } }
+        ]
+        : [
+            { id: 'edit', label: 'Editar Perfil' },
+            { id: 'notifications', label: 'Notificações' },
+            { id: 'addresses', label: 'Meus Endereços' },
+            { id: 'help', label: 'Ajuda' },
+            { id: 'privacy', label: 'Política de Privacidade' },
+            { id: 'delete_account', label: 'Excluir Minha Conta', style: { color: '#e74c3c' } }
+        ];
 
     return (
         <div style={{ paddingBottom: '80px' }}>
@@ -287,7 +303,9 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                     </div>
                     <h2 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', fontWeight: '700' }}>{user.name}</h2>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        {currentUser?.role === 'collector' ? 'Catador Parceiro' : 'Doador Nível 3'}
+                        {currentUser?.role === 'cooperative'
+                            ? 'Unidade de Triagem Parceira'
+                            : currentUser?.role === 'collector' ? 'Catador Parceiro' : 'Doador Nível 3'}
                     </p>
                 </div>
 
@@ -297,20 +315,30 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
                         </div>
-                        <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', fontWeight: '700' }}>{user.points}</h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Pontos Eco</p>
+                        <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', fontWeight: '700' }}>
+                            {currentUser?.role === 'cooperative' ? (user.homologations_count || 0) : currentUser?.role === 'collector' ? (user.collections_count || 0) : (user.points || 0)}
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>
+                            {currentUser?.role === 'cooperative' ? 'Lotes Homologados' : currentUser?.role === 'collector' ? 'Coletas' : 'Pontos Eco'}
+                        </p>
                     </div>
                     <div className="glass-panel" style={{ padding: '20px', textAlign: 'center', background: 'white', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-sm)' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--secondary-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                         </div>
-                        <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', fontWeight: '700' }}>{user.weight_recycled}kg</h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>Reciclados</p>
+                        <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', fontWeight: '700' }}>
+                            {currentUser?.role === 'cooperative'
+                                ? `${Number(user.total_received_kg || 0).toLocaleString('pt-BR')}kg`
+                                : currentUser?.role === 'collector' ? `R$ ${Number(user.earnings || 0).toLocaleString('pt-BR')}` : `${user.weight_recycled || 0}kg`}
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>
+                            {currentUser?.role === 'cooperative' ? 'Peso Aferido' : currentUser?.role === 'collector' ? 'Ganhos' : 'Reciclados'}
+                        </p>
                     </div>
                 </div>
 
                 {/* Meu Eco-Jardim Shortcut Button */}
-                <button 
+                {currentUser?.role !== 'cooperative' && <button
                     onClick={() => onNavigate('garden')}
                     style={{
                         marginBottom: '20px',
@@ -344,24 +372,17 @@ const Profile = ({ onNavigate, onLogout, user: currentUser }) => {
                         <path d="M12 14c-4 0-7-3-7-7a7 7 0 0 1 14 0c0 4-3 7-7 7z"></path>
                     </svg>
                     VISITAR MEU ECO-JARDIM
-                </button>
+                </button>}
 
                 {/* Settings List */}
                 <div className="glass-panel" style={{ background: 'white', overflow: 'hidden', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)', boxShadow: 'var(--shadow-sm)' }}>
-                    {[
-                        { id: 'edit', label: 'Editar Perfil' },
-                        { id: 'notifications', label: 'Notificações' },
-                        { id: 'addresses', label: 'Meus Endereços' },
-                        { id: 'help', label: 'Ajuda' },
-                        { id: 'privacy', label: 'Política de Privacidade' },
-                        { id: 'delete_account', label: 'Excluir Minha Conta', style: { color: '#e74c3c' } }
-                    ].map((item, index) => (
+                    {profileMenuItems.map((item, index) => (
                         <div
                             key={item.id}
                             onClick={() => setActiveModal(item.id)}
                             style={{
                                 padding: '16px 20px',
-                                borderBottom: index < 5 ? '1px solid var(--surface-border)' : 'none',
+                                borderBottom: index < profileMenuItems.length - 1 ? '1px solid var(--surface-border)' : 'none',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import CertificateModal from './CertificateModal';
 
 const History = ({ onBack, user: currentUser }) => {
     const [history, setHistory] = useState([]);
+    const [certificateItemId, setCertificateItemId] = useState(null);
 
     useEffect(() => {
         if (!currentUser || !currentUser.id) return;
@@ -28,6 +30,8 @@ const History = ({ onBack, user: currentUser }) => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'collected': return 'var(--primary-color)';
+            case 'homologated': return '#0ea5e9';
+            case 'recycled': return '#059669';
             case 'reserved': return '#f1c40f';
             default: return 'var(--text-secondary)';
         }
@@ -36,6 +40,8 @@ const History = ({ onBack, user: currentUser }) => {
     const getStatusLabel = (status) => {
         switch (status) {
             case 'collected': return 'Concluído';
+            case 'homologated': return 'Homologado';
+            case 'recycled': return 'Reciclado';
             case 'reserved': return 'Reservado';
             case 'available': return 'Pendente';
             default: return status;
@@ -102,12 +108,19 @@ const History = ({ onBack, user: currentUser }) => {
                                         {currentUser && currentUser.role === 'collector' ? `R$ ${(item.weight_kg * 0.5).toFixed(2)}` : `+${Math.round(item.weight_kg * 10)} pts`}
                                     </span>
                                     <span style={{ fontSize: '0.75rem', color: getStatusColor(item.status), fontWeight: '500' }}>{getStatusLabel(item.status)}</span>
+                                    <button
+                                        onClick={() => setCertificateItemId(item.id)}
+                                        style={{ display: 'block', margin: '7px 0 0 auto', padding: '5px 9px', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', cursor: 'pointer', fontSize: '.68rem', fontWeight: 700 }}
+                                    >
+                                        Ver passaporte
+                                    </button>
                                 </div>
                             </div>
                         ))
                     )}
                 </div>
             </div>
+            {certificateItemId && <CertificateModal itemId={certificateItemId} onClose={() => setCertificateItemId(null)} />}
         </div>
     );
 };

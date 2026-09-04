@@ -4,11 +4,9 @@ import { api } from '../services/api';
 const CertificateModal = ({ itemId, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [traceData, setTraceData] = useState(null);
-    const [corruptSimulated, setCorruptSimulated] = useState(false);
 
     useEffect(() => {
         if (!itemId) return;
-        setLoading(true);
         api.getTraceabilityLedger(itemId)
             .then(data => {
                 setTraceData(data);
@@ -48,11 +46,7 @@ const CertificateModal = ({ itemId, onClose }) => {
 
     const { item, audit } = traceData;
     
-    // Simulate direct DB hack to show anti-fraud verification
-    const isChainValid = corruptSimulated ? false : audit.isValid;
-    const fraudMessage = corruptSimulated 
-        ? "⚠️ CRITICAL FRAUD ALERT: Alteração de dados detectada retroativamente no bloco COOP_RECEIPT! Hash recalculado difere do salvo. Lote bloqueado."
-        : audit.reason;
+    const isChainValid = audit.isValid;
 
     const renderStepIcon = (step) => {
         switch (step) {
@@ -91,10 +85,10 @@ const CertificateModal = ({ itemId, onClose }) => {
                     position: 'relative'
                 }}>
                     <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>
-                        Certificado Digital de Rastreabilidade 🛡️
+                        Passaporte Circular do Lote
                     </h2>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', opacity: 0.9 }}>
-                        Chave do Ledger: {item.id ? `ITEM-LOT-${item.id}-2024` : ''}
+                        Registro: {item.receipt_number || `GT-LOTE-${item.id}`}
                     </p>
 
                     <button onClick={onClose} style={headerCloseBtnStyle}>✕</button>
@@ -118,31 +112,13 @@ const CertificateModal = ({ itemId, onClose }) => {
                                 fontWeight: 800,
                                 color: isChainValid ? '#065f46' : '#991b1b'
                             }}>
-                                {isChainValid ? 'CADEIA 100% ÍNTEGRA & HOMOLOGADA' : 'CADEIA ADULTERADA / QUEBRA DE HASH'}
+                                {isChainValid ? 'CADEIA DE REGISTROS ÍNTEGRA' : 'INCONSISTÊNCIA DETECTADA NOS REGISTROS'}
                             </span>
                         </div>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: isChainValid ? '#047857' : '#b91c1c', lineHeight: 1.3 }}>
-                            {fraudMessage}
+                            {audit.reason} Verificação realizada por encadeamento SHA-256.
                         </p>
                     </div>
-
-                    {/* Demonstration Anti-Fraud Button */}
-                    <button 
-                        onClick={() => setCorruptSimulated(!corruptSimulated)}
-                        style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: isChainValid ? '#047857' : '#991b1b',
-                            color: 'white',
-                            fontSize: '0.65rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            flexShrink: 0
-                        }}
-                    >
-                        {isChainValid ? 'Simular Fraude' : 'Restaurar Ledger'}
-                    </button>
                 </div>
 
                 {/* Modal scroll area */}
@@ -153,14 +129,15 @@ const CertificateModal = ({ itemId, onClose }) => {
                         <div>
                             <span style={labelTitleStyle}>Material Rastreável</span>
                             <span style={labelValueStyle}>
-                                {item.type === 'plastic' ? '🥤 Plástico PET' :
-                                 item.type === 'aluminum' ? '🥫 Alumínio' :
-                                 item.type === 'paper' ? '📦 Papelão' : '🍾 Vidro'}
+                                {(item.homologated_type || item.type) === 'plastic' ? '🥤 Plástico' :
+                                 (item.homologated_type || item.type) === 'aluminum' || (item.homologated_type || item.type) === 'metal' ? '🥫 Metal' :
+                                 (item.homologated_type || item.type) === 'paper' ? '📦 Papel e papelão' :
+                                 (item.homologated_type || item.type) === 'electronic' ? '🔌 Eletrônicos' : '🍾 Vidro'}
                             </span>
                         </div>
                         <div>
                             <span style={labelTitleStyle}>Peso Homologado</span>
-                            <span style={labelValueStyle}>{item.weight_kg ? `${item.weight_kg.toFixed(2)} KG` : 'Aguardando balança'}</span>
+                            <span style={labelValueStyle}>{item.homologated_weight_kg ? `${Number(item.homologated_weight_kg).toFixed(2)} KG` : 'Aguardando balança'}</span>
                         </div>
                         <div>
                             <span style={labelTitleStyle}>Status Operacional</span>
@@ -179,12 +156,12 @@ const CertificateModal = ({ itemId, onClose }) => {
 
                     {/* Timeline title */}
                     <h4 style={{ margin: '0 0 16px 0', color: '#374151', fontSize: '0.95rem', fontWeight: 800 }}>
-                        Cadeia de Custódia Criptográfica (Timeline Auditável)
+                        Cadeia de custódia com integridade verificável
                     </h4>
 
                     {/* Timeline Elements */}
                     <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', paddingLeft: '20px', borderLeft: '2px dashed #cbd5e1', marginLeft: '12px', gap: '20px' }}>
-                        {audit.chain && audit.chain.map((block, idx) => {
+                        {audit.chain && audit.chain.map((block) => {
                             const payload = JSON.parse(block.payload || '{}');
                             return (
                                 <div key={block.id} style={{ position: 'relative' }}>
@@ -223,7 +200,7 @@ const CertificateModal = ({ itemId, onClose }) => {
                                         <p style={{ margin: '4px 0 8px 0', fontSize: '0.75rem', color: '#4b5563' }}>
                                             Responsável: <b>{block.actor_role === 'producer' ? `Cidadão (${item.producer_name || 'Doador'})` :
                                                              block.actor_role === 'collector' ? `Catador (${item.collector_name || 'Coletor'})` :
-                                                             block.actor_role === 'cooperative' ? 'Cooperativa Balança' : 'Indústria Recicladora'}</b>
+                                                             block.actor_role === 'cooperative' ? (item.cooperative_name || 'Cooperativa cadastrada') : 'Indústria Recicladora'}</b>
                                         </p>
 
                                         {/* Payload specific data */}
@@ -231,7 +208,7 @@ const CertificateModal = ({ itemId, onClose }) => {
                                             {block.step === 'DISCARD' && `📍 Localização: ${payload.address || 'Ponto cadastrado'} \n📦 Peso estimado: ${payload.weight_kg || '0'} kg`}
                                             {block.step === 'RESERVE' && `🚚 Status: Rota aceita e coleta reservada.`}
                                             {block.step === 'COLLECTION' && `🚛 Coleta realizada e assinada digitalmente.`}
-                                            {block.step === 'COOP_RECEIPT' && `⚖️ Peso balança homologada: ${payload.balanza_weight_kg} kg \n🎫 Recibo fiscal: ${payload.receipt_number}`}
+                                            {block.step === 'COOP_RECEIPT' && `⚖️ Peso aferido: ${payload.measured_weight_kg ?? payload.balanza_weight_kg} kg \n🎫 Comprovante: ${payload.receipt_number}\n🏭 Destino: ${payload.final_destination || 'Não informado'}`}
                                             {block.step === 'INDUSTRY_RECYCLE' && `🏭 Indústria destino: ${payload.industry_name} \n🔑 Lote Indústria: ${payload.recycling_batch}`}
                                         </div>
 
@@ -258,32 +235,12 @@ const CertificateModal = ({ itemId, onClose }) => {
                     borderBottomLeftRadius: '24px',
                     borderBottomRightRadius: '24px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Simulation QR Code */}
-                        <div style={{
-                            width: '45px',
-                            height: '45px',
-                            background: '#111',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            color: '#fff',
-                            fontSize: '0.4rem',
-                            fontWeight: 800,
-                            padding: '4px',
-                            textAlign: 'center',
-                            lineHeight: 1.1,
-                            borderRadius: '4px'
-                        }}>
-                            QR CODE AUDIT
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: '#6b7280', maxWidth: '120px', lineHeight: 1.2 }}>
-                            Escaneie para validar a blockchain do lote no portal de logística reversa.
-                        </span>
-                    </div>
+                    <span style={{ fontSize: '0.68rem', color: '#6b7280', maxWidth: '230px', lineHeight: 1.3 }}>
+                        SHA-256 permite detectar alterações nos registros. Isso não representa auditoria externa nem blockchain.
+                    </span>
 
-                    <button 
-                        onClick={() => alert("Certificado gerado com sucesso! Arquivo PDF simulado e pronto para arquivamento.")}
+                    <button
+                        onClick={onClose}
                         style={{
                             padding: '10px 20px',
                             borderRadius: '12px',
@@ -292,12 +249,11 @@ const CertificateModal = ({ itemId, onClose }) => {
                             color: '#fff',
                             fontWeight: 700,
                             fontSize: '0.8rem',
-                            cursor: isChainValid ? 'pointer' : 'default',
+                            cursor: 'pointer',
                             boxShadow: isChainValid ? '0 4px 10px rgba(4, 120, 87, 0.15)' : 'none'
                         }}
-                        disabled={!isChainValid}
                     >
-                        Exportar Certificado
+                        Fechar comprovante
                     </button>
                 </div>
             </div>

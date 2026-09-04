@@ -1,4 +1,10 @@
-import db, { generateSHA256 } from '../db-sqlite.js';
+import crypto from 'crypto';
+import db from '../db.js';
+
+const generateSHA256 = (data) => crypto
+    .createHash('sha256')
+    .update(typeof data === 'string' ? data : JSON.stringify(data))
+    .digest('hex');
 
 export const traceabilityService = {
     /**

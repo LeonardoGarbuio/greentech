@@ -41,8 +41,10 @@ const Login = ({ onLogin, onGoogleLogin }) => {
     const handleQuickLogin = (quickRole) => {
         if (quickRole === 'producer') {
             onLogin('producer@test.com', 'password');
-        } else {
+        } else if (quickRole === 'collector') {
             onLogin('collector@test.com', 'password');
+        } else {
+            onLogin('cooperative@test.com', 'password');
         }
     };
 
@@ -106,7 +108,7 @@ const Login = ({ onLogin, onGoogleLogin }) => {
             } else {
                 setError(data.message || 'Erro na criação da conta.');
             }
-        } catch (err) {
+        } catch {
             setError('Erro ao concluir cadastro Google.');
         }
         setLoading(false);
@@ -135,6 +137,13 @@ const Login = ({ onLogin, onGoogleLogin }) => {
                             style={{ padding: '20px', background: '#fff3e0', color: '#e65100', border: '2px solid #f39c12', borderRadius: '16px', fontWeight: '800', fontSize: '1.1rem', cursor: loading ? 'not-allowed' : 'pointer' }}
                         >
                             🚛 Sou um Catador
+                        </button>
+                        <button
+                            onClick={() => handleGoogleRoleSelection('cooperative')}
+                            disabled={loading}
+                            style={{ padding: '20px', background: '#eff6ff', color: '#075985', border: '2px solid #38bdf8', borderRadius: '16px', fontWeight: '800', fontSize: '1.1rem', cursor: loading ? 'not-allowed' : 'pointer' }}
+                        >
+                            🏭 Sou uma Cooperativa
                         </button>
                     </div>
                 </div>
@@ -242,7 +251,7 @@ const Login = ({ onLogin, onGoogleLogin }) => {
                     {isRegisterMode && (
                         <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
                             <label style={{ display: 'block', marginBottom: '12px', color: '#334e68', fontWeight: '700', fontSize: '0.9rem' }}>Eu quero ser um...</label>
-                            <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <button
                                     type="button"
                                     onClick={() => setRole('producer')}
@@ -270,6 +279,20 @@ const Login = ({ onLogin, onGoogleLogin }) => {
                                     }}
                                 >
                                     🚛 Catador
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRole('cooperative')}
+                                    style={{
+                                        gridColumn: '1 / -1', padding: '14px',
+                                        background: role === 'cooperative' ? '#eff6ff' : 'white',
+                                        color: role === 'cooperative' ? '#075985' : '#627d98',
+                                        border: role === 'cooperative' ? '2px solid #38bdf8' : '2px solid #d9e2ec',
+                                        borderRadius: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    🏭 Cooperativa
                                 </button>
                             </div>
                         </div>
@@ -354,7 +377,7 @@ const Login = ({ onLogin, onGoogleLogin }) => {
 
                 <div style={{ marginTop: '32px', borderTop: '2px dashed #e4e9f2', paddingTop: '32px' }}>
                     <p style={{ textAlign: 'center', color: '#9fb3c8', marginBottom: '20px', fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>Acesso de Demonstração</p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         <button
                             type="button"
                             onClick={() => handleQuickLogin('producer')}
@@ -378,6 +401,18 @@ const Login = ({ onLogin, onGoogleLogin }) => {
                             }}
                         >
                             Modo Catador
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleQuickLogin('cooperative')}
+                            style={{
+                                gridColumn: '1 / -1', padding: '12px', background: 'white',
+                                color: '#0284c7', border: '1px solid #d9e2ec', borderRadius: '12px',
+                                fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s',
+                                fontSize: '0.9rem', boxSizing: 'border-box'
+                            }}
+                        >
+                            Modo Cooperativa
                         </button>
                     </div>
                 </div>

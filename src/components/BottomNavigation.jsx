@@ -1,7 +1,7 @@
 import React from 'react';
 
 const BottomNavigation = ({ currentView, onNavigate, userRole }) => {
-    const navItems = [
+    const standardNavItems = [
         {
             id: 'home',
             label: 'Início',
@@ -23,6 +23,14 @@ const BottomNavigation = ({ currentView, onNavigate, userRole }) => {
             icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         }
     ];
+
+    const cooperativeNavItems = [
+        { id: 'home', label: 'Painel', icon: <span className="material-symbols-outlined">dashboard</span> },
+        { id: 'history', label: 'Lotes', icon: <span className="material-symbols-outlined">inventory_2</span> },
+        { id: 'profile', label: 'Perfil', icon: <span className="material-symbols-outlined">factory</span> }
+    ];
+
+    const navItems = userRole === 'cooperative' ? cooperativeNavItems : standardNavItems;
 
     return (
         <div style={{

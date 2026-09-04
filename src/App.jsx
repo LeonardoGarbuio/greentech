@@ -14,6 +14,8 @@ import Leaderboard from './components/Leaderboard';
 import Guide from './components/Guide';
 import History from './components/History';
 import EcoStore from './components/EcoStore';
+import ImpactCenter from './components/ImpactCenter';
+import CooperativeHome from './components/CooperativeHome';
 import { api } from './services/api';
 
 const App = () => {
@@ -144,7 +146,6 @@ const App = () => {
         setIsLoggedIn(true);
         setUserRole(data.user.role || 'producer');
         setUserId(data.user.id);
-        saveSession(data.user);
         if (!data.user.onboarding_completed) {
           setShowOnboarding(true);
         } else {
@@ -226,10 +227,16 @@ const App = () => {
   const renderScreen = () => {
     switch (currentView) {
       case 'home':
+        if (userRole === 'cooperative') {
+          return <CooperativeHome onNavigate={handleNavigate} user={user} />;
+        }
         return userRole === 'collector'
           ? <CollectorHome onNavigate={handleNavigate} user={user} />
           : <Home onNavigate={handleNavigate} user={user} />;
       case 'dashboard':
+        if (userRole === 'cooperative') {
+          return <CooperativeHome onNavigate={handleNavigate} user={user} />;
+        }
         return <Dashboard
           items={feedItems}
           onAccept={handleAcceptItem}
@@ -242,6 +249,9 @@ const App = () => {
       case 'post-item': // Kept as 'post-item' to match existing usage
         return <PostItem onAddItem={handleAddItem} onBack={() => setCurrentView('home')} />;
       case 'history':
+        if (userRole === 'cooperative') {
+          return <CooperativeHome onNavigate={handleNavigate} user={user} historyOnly />;
+        }
         return <History onBack={() => setCurrentView('home')} user={user} />;
       case 'profile':
         return <Profile onNavigate={handleNavigate} onLogout={handleLogout} user={user} />;
@@ -257,8 +267,12 @@ const App = () => {
         return <Guide onNavigate={handleNavigate} />;
       case 'store':
         return <EcoStore user={user} onUpdateUser={() => {}} />;
+      case 'impact':
+        return <ImpactCenter user={user} onBack={() => setCurrentView('home')} />;
       default:
-        return <Home onNavigate={handleNavigate} user={user} />;
+        return userRole === 'cooperative'
+          ? <CooperativeHome onNavigate={handleNavigate} user={user} />
+          : <Home onNavigate={handleNavigate} user={user} />;
     }
   };
 

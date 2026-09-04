@@ -27,6 +27,14 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+const USER_TABLES = {
+    producer: 'producers',
+    collector: 'collectors',
+    cooperative: 'cooperatives'
+};
+
+const getUserTable = (role) => USER_TABLES[role] || null;
+
 // Health Check / DB Status
 app.get('/api/health', async (req, res) => {
     const { init } = req.query;
@@ -117,7 +125,34 @@ app.post('/api/login', async (req, res) => {
             });
         }
 
-        // 3. Not found
+        // 3. Try finding in Cooperatives
+        const cooperative = await db.get("SELECT * FROM cooperatives WHERE email = ?", [email]);
+
+        if (cooperative) {
+            const isMatch = cooperative.password.startsWith('$2')
+                ? await bcrypt.compare(password, cooperative.password)
+                : cooperative.password === password;
+
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Senha incorreta' });
+            }
+
+            const token = jwt.sign({ id: cooperative.id, role: 'cooperative' }, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({
+                success: true,
+                token,
+                user: {
+                    id: cooperative.id,
+                    name: cooperative.name,
+                    email: cooperative.email,
+                    role: 'cooperative',
+                    avatar_url: cooperative.avatar_url,
+                    onboarding_completed: !!cooperative.onboarding_completed
+                }
+            });
+        }
+
+        // 4. Not found
         res.status(404).json({ success: false, message: 'Usuário não encontrado' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -131,14 +166,18 @@ app.post('/api/register', async (req, res) => {
         return res.status(400).json({ success: false, message: 'Preencha todos os campos obrigatórios.' });
     }
 
-    const table = role === 'producer' ? 'producers' : 'collectors';
+    const table = getUserTable(role);
+    if (!table) {
+        return res.status(400).json({ success: false, message: 'Perfil inválido.' });
+    }
 
     try {
         // Check if email already exists in either table
         const producerExists = await db.get("SELECT id FROM producers WHERE email = ?", [email]);
         const collectorExists = await db.get("SELECT id FROM collectors WHERE email = ?", [email]);
+        const cooperativeExists = await db.get("SELECT id FROM cooperatives WHERE email = ?", [email]);
 
-        if (producerExists || collectorExists) {
+        if (producerExists || collectorExists || cooperativeExists) {
             return res.status(400).json({ success: false, message: 'Este e-mail já está cadastrado.' });
         }
 
@@ -161,10 +200,16 @@ app.post('/api/register', async (req, res) => {
                 [newUserId, 'Bem-vindo!', 'Sua conta de Doador foi criada com sucesso.', 'system']
             );
 
-        } else {
+        } else if (role === 'collector') {
             const result = await db.run(
                 "INSERT INTO collectors (name, email, password, vehicle_type) VALUES (?, ?, ?, ?)",
                 [name, email, hashedPassword, 'Outro'] // Default vehicle type
+            );
+            newUserId = result.lastID;
+        } else {
+            const result = await db.run(
+                "INSERT INTO cooperatives (name, email, password) VALUES (?, ?, ?)",
+                [name, email, hashedPassword]
             );
             newUserId = result.lastID;
         }
@@ -219,6 +264,25 @@ app.post('/api/auth/google', async (req, res) => {
             });
         }
 
+        // Tentar buscar em cooperatives
+        user = await db.get('SELECT * FROM cooperatives WHERE email = ?', [email]);
+        if (user) {
+            const token3 = jwt.sign({ id: user.id, role: 'cooperative' }, JWT_SECRET, { expiresIn: '7d' });
+            return res.json({
+                success: true,
+                token: token3,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: 'cooperative',
+                    avatar_url: user.avatar_url || photoUrl,
+                    onboarding_completed: !!user.onboarding_completed
+                },
+                isNewUser: false
+            });
+        }
+
         // Tentar buscar em collectors
         user = await db.get('SELECT * FROM collectors WHERE email = ?', [email]);
         if (user) {
@@ -245,7 +309,10 @@ app.post('/api/auth/google', async (req, res) => {
         }
 
         const userRole = role || 'producer';
-        const table = userRole === 'collector' ? 'collectors' : 'producers';
+        const table = getUserTable(userRole);
+        if (!table) {
+            return res.status(400).json({ success: false, message: 'Perfil inválido.' });
+        }
         const randomPassword = Math.random().toString(36).slice(-8);
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
@@ -285,7 +352,8 @@ app.post('/api/auth/google', async (req, res) => {
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
     try {
         const { id, role } = req.user;
-        const table = role === 'collector' ? 'collectors' : 'producers';
+        const table = getUserTable(role);
+        if (!table) return res.status(400).json({ success: false, message: 'Perfil inválido' });
         
         const user = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [id]);
         
@@ -317,7 +385,8 @@ app.put('/api/user/onboarding', async (req, res) => {
     const { id, role } = req.body;
     if (!id || !role) return res.status(400).json({ error: 'Faltando id ou role' });
 
-    const table = role === 'producer' ? 'producers' : 'collectors';
+    const table = getUserTable(role);
+    if (!table) return res.status(400).json({ error: 'Perfil inválido' });
     try {
         await db.run(`UPDATE ${table} SET onboarding_completed = 1 WHERE id = ?`, [id]);
         res.json({ success: true });
@@ -335,7 +404,8 @@ app.get('/api/user', async (req, res) => {
 
     if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
 
-    const table = role === 'producer' ? 'producers' : 'collectors';
+    const table = getUserTable(role);
+    if (!table) return res.status(400).json({ error: 'Perfil inválido' });
 
     try {
         const row = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [id]);
@@ -384,6 +454,393 @@ app.get('/api/items', async (req, res) => {
     }
 });
 
+// --- REDE NACIONAL DE RECICLAGEM ---
+// A cobertura comunitária vem do OpenStreetMap; cadastros municipais curados entram
+// como camadas oficiais adicionais. Preços precisam ser confirmados com cada local.
+const PONTA_GROSSA_COOPERATIVES = [
+    {
+        id: 'acamaro',
+        name: 'ACAMARO',
+        full_name: 'Associação dos Catadores de Materiais Recicláveis do Bairro de Oficinas',
+        address: 'Rua Padre Anchieta, 250 - Oficinas, Ponta Grossa - PR',
+        lat: -25.1298008,
+        lng: -50.1641352,
+        phone: '(42) 3222-1206',
+        service_area: 'Oficinas e região sul',
+        price_status: 'Consulte a associação',
+        location_verified: true,
+        data_source: 'Cadastro público CNPJ',
+        source_url: 'https://cnpj.biz/08018008000197',
+        geocoding_source: 'OpenStreetMap Nominatim',
+        verified_at: '2026-05-25'
+    },
+    {
+        id: 'acamaruva',
+        name: 'ACAMARUVA',
+        full_name: 'Associação dos Catadores de Materiais Recicláveis do Bairro de Uvaranas',
+        address: 'Rua Clycema Kossatz Carvalho, 79 - Vila San Martin, Neves, Ponta Grossa - PR',
+        lat: -25.072155849539,
+        lng: -50.103238965521,
+        phone: null,
+        service_area: 'Uvaranas e região leste',
+        price_status: 'Consulte a associação',
+        location_verified: true,
+        data_source: 'Diário Oficial de Ponta Grossa',
+        source_url: 'https://pontagrossa.oxy.elotech.com.br/ged-api/api/file/get-file-content?key=oxy_diario_oficial%2Fdiario-oficial-ordinaria-4523-03-26-2026-17%3A48%3A50_signed',
+        geocoding_source: 'ArcGIS World Geocoding',
+        verified_at: '2026-09-04'
+    },
+    {
+        id: 'acamaru',
+        name: 'ACAMARU',
+        full_name: 'Associação dos Catadores de Materiais Recicláveis da Nova Rússia',
+        address: 'Rua Pedro Luiz Correia, 39 - Chapada, Ponta Grossa - PR',
+        lat: -25.081487007011,
+        lng: -50.201017041784,
+        phone: null,
+        service_area: 'Nova Rússia e região oeste',
+        price_status: 'Consulte a associação',
+        location_verified: true,
+        data_source: 'Cadastro público CNPJ',
+        source_url: 'https://cnpj.biz/08018002000110',
+        geocoding_source: 'ArcGIS World Geocoding',
+        verified_at: '2026-09-04'
+    }
+];
+
+// Rede municipal oficial de Curitiba. Endereços publicados pela Prefeitura e
+// coordenadas conferidas no OpenStreetMap em 04/09/2026.
+const CURITIBA_COLLECTION_POINTS = [
+    { id: 'curitiba-jandaia', name: 'Ecoponto Jandaia', address: 'Rua Jornalista José Pedro dos Santos, 801 - Ganchinho, Curitiba - PR', lat: -25.5547644, lng: -49.2439527 },
+    { id: 'curitiba-vila-nova', name: 'Ecoponto Vila Nova', address: 'Rua Tenente-Coronel Vilagran Cabrita, 2495 - Alto Boqueirão, Curitiba - PR', lat: -25.5294141, lng: -49.2304675 },
+    { id: 'curitiba-erico-verissimo', name: 'Ecoponto Érico Veríssimo', address: 'Rua Capitão Amin Mosse, 557 - Alto Boqueirão, Curitiba - PR', lat: -25.5321003, lng: -49.2513283 },
+    { id: 'curitiba-guacui', name: 'Ecoponto Guaçuí', address: 'Rua Maria Augusta, 1 - Sítio Cercado, Curitiba - PR', lat: -25.5502599, lng: -49.2548565 },
+    { id: 'curitiba-vila-verde', name: 'Ecoponto Vila Verde', address: 'Rua Lýdio Paulo Bettega, 200 - CIC, Curitiba - PR', lat: -25.530117, lng: -49.3404499 },
+    { id: 'curitiba-cic', name: 'Ecoponto CIC', address: 'Rua Orestes Thá, 1765 - CIC, Curitiba - PR', lat: -25.5121016, lng: -49.3317329 },
+    { id: 'curitiba-caiua', name: 'Ecoponto Caiuá', address: 'Avenida Juscelino Kubitschek de Oliveira, 6800 - CIC, Curitiba - PR', lat: -25.491034, lng: -49.3456058 },
+    { id: 'curitiba-cajuru', name: 'Ecoponto Cajuru', address: 'Rua Neusa Vieira Bet, 255 - Cajuru, Curitiba - PR', lat: -25.4630191, lng: -49.1950815 },
+    { id: 'curitiba-campo-santana', name: 'Ecoponto Campo de Santana', address: 'Rua Teresa de Freitas Tavares, 331 - Campo de Santana, Curitiba - PR', lat: -25.5797876, lng: -49.3273641 },
+    { id: 'curitiba-sambaqui', name: 'Ecoponto Sambaqui', address: 'Rua Radialista Souza Moreno, 30 - Sítio Cercado, Curitiba - PR', lat: -25.5547771, lng: -49.2666951 },
+    { id: 'curitiba-icarai', name: 'Ecoponto Icaraí', address: 'Rua Olindo Caetani, 1330 - Uberaba, Curitiba - PR', lat: -25.4911263, lng: -49.2029685 },
+    { id: 'curitiba-metropolitano', name: 'Ecoponto Metropolitano', address: 'Rua da Independência, 340 - São Braz, Curitiba - PR', lat: -25.4211034, lng: -49.3638197 }
+].map((point) => ({
+    ...point,
+    full_name: point.name,
+    phone: '156',
+    service_area: 'Curitiba',
+    accepted_materials: ['recicláveis', 'eletroeletrônicos', 'óleo de cozinha', 'móveis', 'madeira e resíduos vegetais'],
+    price_status: 'Ponto público de entrega; não realiza compra',
+    location_verified: true,
+    route_eligible: true,
+    data_source: 'Prefeitura de Curitiba',
+    source_url: 'https://www.curitiba.pr.gov.br/noticias/ecopontos-sao-o-lugar-certo-para-descarte-de-residuos-da-construcao-e-vegetais-veja-os-enderecos/78356',
+    geocoding_source: 'OpenStreetMap Nominatim',
+    verified_at: '2026-09-04'
+}));
+
+const distanceInKm = (lat1, lng1, lat2, lng2) => {
+    const earthRadius = 6371;
+    const toRadians = (degrees) => degrees * Math.PI / 180;
+    const deltaLat = toRadians(lat2 - lat1);
+    const deltaLng = toRadians(lng2 - lng1);
+    const value = Math.sin(deltaLat / 2) ** 2
+        + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(deltaLng / 2) ** 2;
+    return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+};
+
+const cooperativeSearchCache = new Map();
+const COOPERATIVE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const geocodeCache = new Map();
+const GEOCODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let lastNominatimRequestAt = 0;
+let nominatimQueue = Promise.resolve();
+
+const runNominatimRequest = (request) => {
+    const queued = nominatimQueue.then(async () => {
+        const waitMs = Math.max(0, 1000 - (Date.now() - lastNominatimRequestAt));
+        if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+        lastNominatimRequestAt = Date.now();
+        return request();
+    });
+    nominatimQueue = queued.catch(() => undefined);
+    return queued;
+};
+
+const formatOsmAddress = (tags = {}) => {
+    const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(', ');
+    const locality = [tags['addr:suburb'], tags['addr:city'], tags['addr:state']].filter(Boolean).join(' - ');
+    return [street, locality].filter(Boolean).join(' · ') || 'Endereço disponível no mapa';
+};
+
+const mapOsmCooperative = (element, userLat, userLng) => {
+    const lat = Number(element.lat ?? element.center?.lat);
+    const lng = Number(element.lon ?? element.center?.lon);
+    const tags = element.tags || {};
+    const materials = Object.entries(tags)
+        .filter(([key, value]) => key.startsWith('recycling:') && value === 'yes')
+        .map(([key]) => key.replace('recycling:', '').replaceAll('_', ' '));
+    const placeName = tags.name || tags.operator || 'Ponto de reciclagem';
+    const organizationPattern = /cooper|associa|catador|reciclag|sucata|aparas/i;
+    const routeEligible = tags.industrial === 'recycling' || organizationPattern.test(placeName);
+
+    return {
+        id: `osm-${element.type}-${element.id}`,
+        name: placeName,
+        full_name: tags.operator || tags.name || 'Local cadastrado no OpenStreetMap',
+        address: formatOsmAddress(tags),
+        lat,
+        lng,
+        phone: tags.phone || tags['contact:phone'] || null,
+        website: tags.website || tags['contact:website'] || null,
+        service_area: tags['addr:city'] || tags['addr:suburb'] || 'Próximo da sua localização',
+        accepted_materials: materials,
+        price_status: 'Consulte o local',
+        route_eligible: routeEligible,
+        location_verified: false,
+        verified_at: null,
+        data_source: 'OpenStreetMap',
+        source_url: `https://www.openstreetmap.org/${element.type}/${element.id}`,
+        distance_km: Number(distanceInKm(userLat, userLng, lat, lng).toFixed(1))
+    };
+};
+
+const createApproximateMunicipalCoverage = async (lat, lng) => {
+    const headers = {
+        'User-Agent': 'GreenTech-IFTech/1.0 (academic recycling locator)',
+        'Accept-Language': 'pt-BR,pt;q=0.9'
+    };
+    const fetchNominatim = (url) => runNominatimRequest(async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+            const response = await fetch(url, { headers, signal: controller.signal });
+            if (!response.ok) throw new Error(`Nominatim respondeu ${response.status}`);
+            return response.json();
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    });
+
+    const reverseParams = new URLSearchParams({
+        lat: String(lat),
+        lon: String(lng),
+        format: 'jsonv2',
+        zoom: '10',
+        addressdetails: '1'
+    });
+    const reverse = await fetchNominatim(`https://nominatim.openstreetmap.org/reverse?${reverseParams}`);
+    const municipality = reverse.address?.city
+        || reverse.address?.town
+        || reverse.address?.municipality
+        || reverse.address?.county;
+    const state = reverse.address?.state;
+    if (!municipality) return null;
+
+    const searchParams = new URLSearchParams({
+        q: [municipality, state, 'Brasil'].filter(Boolean).join(', '),
+        format: 'jsonv2',
+        countrycodes: 'br',
+        limit: '1'
+    });
+    const cityResults = await fetchNominatim(`https://nominatim.openstreetmap.org/search?${searchParams}`);
+    const city = cityResults[0];
+    if (!city) return null;
+
+    return {
+        id: `coverage-${municipality.toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]+/g, '-')}`,
+        name: `Cobertura aproximada · ${municipality}`,
+        full_name: `Área municipal de referência para coleta seletiva em ${municipality}`,
+        address: `${municipality}${state ? ` - ${state}` : ''}`,
+        lat: Number(city.lat),
+        lng: Number(city.lon),
+        phone: null,
+        service_area: 'Centro aproximado do município; não representa um endereço de entrega',
+        accepted_materials: [],
+        price_status: 'Consulte a Prefeitura ou o serviço municipal de coleta seletiva',
+        route_eligible: false,
+        location_verified: false,
+        is_coverage_area: true,
+        data_source: 'OpenStreetMap Nominatim',
+        source_url: 'https://sinir.gov.br/sistemas/catadores/',
+        verified_at: null,
+        distance_km: Number(distanceInKm(lat, lng, Number(city.lat), Number(city.lon)).toFixed(1))
+    };
+};
+
+app.get('/api/geocode', async (req, res) => {
+    const query = String(req.query.q || '').trim();
+    if (query.length < 3) return res.status(400).json({ error: 'Informe uma cidade ou endereço.' });
+
+    const cacheKey = query.toLocaleLowerCase('pt-BR');
+    const cached = geocodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < GEOCODE_CACHE_TTL_MS) {
+        return res.json(cached.data);
+    }
+
+    try {
+        const params = new URLSearchParams({
+            q: query,
+            format: 'jsonv2',
+            countrycodes: 'br',
+            addressdetails: '1',
+            limit: '5'
+        });
+        const data = await runNominatimRequest(async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+                    headers: {
+                        'User-Agent': 'GreenTech-IFTech/1.0 (academic recycling locator)',
+                        'Accept-Language': 'pt-BR,pt;q=0.9'
+                    },
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`Nominatim respondeu ${response.status}`);
+                return response.json();
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        });
+        geocodeCache.set(cacheKey, { createdAt: Date.now(), data });
+        return res.json(data);
+    } catch (error) {
+        console.error('Erro ao localizar endereço:', error.message);
+        return res.status(502).json({ error: 'Serviço de localização temporariamente indisponível.' });
+    }
+});
+
+app.get('/api/cooperatives', async (req, res) => {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+    if (!hasLocation || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return res.status(400).json({ error: 'Informe latitude e longitude válidas.' });
+    }
+
+    const requestedRadius = Number(req.query.radius || 30000);
+    const radius = Math.min(100000, Math.max(1000, requestedRadius));
+    const cacheKey = `${lat.toFixed(2)}:${lng.toFixed(2)}:${radius}`;
+    const cached = cooperativeSearchCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < COOPERATIVE_CACHE_TTL_MS) {
+        return res.json({ ...cached.data, cached: true });
+    }
+
+    const isNearPontaGrossa = distanceInKm(lat, lng, -25.0945, -50.1633) <= 80;
+    const isNearCuritiba = distanceInKm(lat, lng, -25.4284, -49.2733) <= 60;
+    const officialLocal = [
+        ...(isNearPontaGrossa ? PONTA_GROSSA_COOPERATIVES : []),
+        ...(isNearCuritiba ? CURITIBA_COLLECTION_POINTS : [])
+    ].map((cooperative) => ({
+            ...cooperative,
+            route_eligible: cooperative.location_verified,
+            data_source: cooperative.data_source || 'Prefeitura de Ponta Grossa',
+            source_url: cooperative.source_url || 'https://www.pontagrossa.pr.gov.br/2026/05/25/prefeitura-abre-formulario-para-interessados-em-atuar-com-reciclagem-em-ponta-grossa/',
+            distance_km: Number(distanceInKm(lat, lng, cooperative.lat, cooperative.lng).toFixed(1))
+        }));
+
+    let osmResults = [];
+    let networkWarning = null;
+    const overpassEndpoints = [
+        process.env.OVERPASS_API_URL,
+        'https://overpass-api.de/api/interpreter',
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass.private.coffee/api/interpreter'
+    ].filter(Boolean);
+    let lastOverpassError = null;
+    const searchRadii = [...new Set([5000, Math.min(radius, 15000), radius])]
+        .filter((searchRadius) => searchRadius <= radius)
+        .sort((a, b) => a - b);
+
+    for (const searchRadius of searchRadii) {
+        const overpassQuery = `[out:json][timeout:8];(
+            nw["amenity"="recycling"]["recycling_type"="centre"](around:${searchRadius},${lat},${lng});
+            nw["industrial"="recycling"](around:${searchRadius},${lat},${lng});
+        );out center tags;`;
+        let radiusRequestSucceeded = false;
+
+        for (const endpoint of [...new Set(overpassEndpoints)]) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'User-Agent': 'GreenTech-IFTech/1.0 (academic recycling locator)'
+                    },
+                    body: new URLSearchParams({ data: overpassQuery }),
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`OpenStreetMap respondeu ${response.status}`);
+                const osmData = await response.json();
+                osmResults = (osmData.elements || [])
+                    .map((element) => mapOsmCooperative(element, lat, lng))
+                    .filter((place) => Number.isFinite(place.lat) && Number.isFinite(place.lng));
+                lastOverpassError = null;
+                radiusRequestSucceeded = true;
+                break;
+            } catch (error) {
+                lastOverpassError = error;
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        if (!radiusRequestSucceeded || osmResults.length > 0) break;
+    }
+
+    if (lastOverpassError) {
+        networkWarning = 'A busca comunitária está temporariamente indisponível.';
+        console.error('Erro ao consultar rede nacional de reciclagem:', lastOverpassError.message);
+    }
+
+    let allResults = [...officialLocal, ...osmResults]
+        .filter((place, index, list) => list.findIndex((candidate) => (
+            candidate.name.toLocaleLowerCase('pt-BR') === place.name.toLocaleLowerCase('pt-BR')
+            && distanceInKm(candidate.lat, candidate.lng, place.lat, place.lng) < 0.25
+        )) === index)
+        .sort((a, b) => a.distance_km - b.distance_km)
+        .slice(0, 30);
+
+    if (allResults.length === 0) {
+        try {
+            const approximateCoverage = await createApproximateMunicipalCoverage(lat, lng);
+            if (approximateCoverage) allResults = [approximateCoverage];
+        } catch (error) {
+            console.error('Erro ao criar cobertura municipal aproximada:', error.message);
+        }
+    }
+
+    const data = {
+        coverage: 'Brasil',
+        updated_at: new Date().toISOString(),
+        sources: [
+            { label: 'OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' },
+            ...(isNearPontaGrossa ? [{
+                label: 'Prefeitura de Ponta Grossa',
+                url: 'https://www.pontagrossa.pr.gov.br/2026/05/25/prefeitura-abre-formulario-para-interessados-em-atuar-com-reciclagem-em-ponta-grossa/'
+            }] : []),
+            ...(isNearCuritiba ? [{
+                label: 'Prefeitura de Curitiba',
+                url: 'https://www.curitiba.pr.gov.br/noticias/ecopontos-sao-o-lugar-certo-para-descarte-de-residuos-da-construcao-e-vegetais-veja-os-enderecos/78356'
+            }] : [])
+        ],
+        registry_reference: {
+            label: 'SINIR - Módulo Catadores',
+            url: 'https://sinir.gov.br/sistemas/catadores/'
+        },
+        price_disclaimer: 'Valores variam e devem ser confirmados diretamente com cada organização.',
+        warning: networkWarning,
+        cooperatives: allResults
+    };
+    // Falhas transitórias não entram no cache; a próxima tentativa pode usar outro espelho.
+    if (!networkWarning) {
+        cooperativeSearchCache.set(cacheKey, { createdAt: Date.now(), data });
+    }
+    return res.json(data);
+});
+
 app.post('/api/items', authenticateToken, async (req, res) => {
     const { type, title, description, weight_kg, lat, lng, address, producer_id } = req.body;
 
@@ -428,8 +885,12 @@ app.delete('/api/items/:id', authenticateToken, async (req, res) => {
 }); // Fixed missing brace here
 
 app.put('/api/items/:id/status', authenticateToken, async (req, res) => {
-    const { status, collector_id, weightCoop, industryId, batchCode } = req.body;
+    const { status, collector_id, industryId, batchCode } = req.body;
     const { id } = req.params;
+
+    if (status === 'homologated') {
+        return res.status(400).json({ error: 'Use a homologação autenticada da cooperativa.' });
+    }
 
     // Se for reserva ou coleta, precisa de coletor
     if ((status === 'reserved' || status === 'collected') && !collector_id) {
@@ -458,14 +919,6 @@ app.put('/api/items/:id/status', authenticateToken, async (req, res) => {
                 collected_at: collectedAt || new Date().toISOString()
             });
             await updateStatsAfterCollection(id, collector_id);
-        } else if (status === 'homologated') {
-            // Cooperativa valida e pesa o lote
-            await traceabilityService.addLedgerEntry(id, 'COOP_RECEIPT', 1, 'cooperative', {
-                cooperative_name: "Coopercaps Centro",
-                balanza_weight_kg: weightCoop || 12.5,
-                receipt_number: `REC-${Math.floor(Math.random() * 900000) + 100000}`,
-                timestamp_coop: new Date().toISOString()
-            });
         } else if (status === 'recycled') {
             // Indústria recicla e emite o crédito final
             await traceabilityService.addLedgerEntry(id, 'INDUSTRY_RECYCLE', industryId || 101, 'industry', {
@@ -478,6 +931,118 @@ app.put('/api/items/:id/status', authenticateToken, async (req, res) => {
         res.json({ success: true, changes: result.changes });
     } catch (err) {
         console.error("Error updating item status:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- COOPERATIVE OPERATIONS ---
+app.get('/api/cooperative/lots', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'cooperative') {
+        return res.status(403).json({ error: 'Acesso exclusivo para cooperativas.' });
+    }
+
+    try {
+        const result = await db.query(`
+            SELECT items.*,
+                   producers.name AS producer_name,
+                   collectors.name AS collector_name,
+                   cooperatives.name AS cooperative_name
+            FROM items
+            LEFT JOIN producers ON items.producer_id = producers.id
+            LEFT JOIN collectors ON items.collector_id = collectors.id
+            LEFT JOIN cooperatives ON items.cooperative_id = cooperatives.id
+            WHERE items.status = 'collected'
+               OR (items.cooperative_id = ? AND items.status IN ('homologated', 'recycled'))
+            ORDER BY CASE WHEN items.status = 'collected' THEN 0 ELSE 1 END,
+                     COALESCE(items.homologated_at, items.collected_at, items.created_at) DESC
+        `, [req.user.id]);
+
+        const lots = result.rows;
+        const pending = lots.filter((item) => item.status === 'collected');
+        const homologated = lots.filter((item) => item.status !== 'collected');
+        const totalWeight = homologated.reduce(
+            (sum, item) => sum + Number(item.homologated_weight_kg || item.weight_kg || 0),
+            0
+        );
+
+        res.json({
+            success: true,
+            lots,
+            stats: {
+                pending_count: pending.length,
+                homologated_count: homologated.length,
+                total_received_kg: totalWeight
+            }
+        });
+    } catch (err) {
+        console.error('Erro ao carregar lotes da cooperativa:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/cooperative/lots/:id/homologate', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'cooperative') {
+        return res.status(403).json({ error: 'Acesso exclusivo para cooperativas.' });
+    }
+
+    const { id } = req.params;
+    const { weightKg, materialType, destination } = req.body;
+    const parsedWeight = Number(weightKg);
+    const allowedTypes = new Set(['paper', 'plastic', 'glass', 'metal', 'aluminum', 'electronic', 'other']);
+
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+        return res.status(400).json({ error: 'Informe um peso aferido válido.' });
+    }
+    if (!allowedTypes.has(materialType)) {
+        return res.status(400).json({ error: 'Selecione uma categoria de material válida.' });
+    }
+    if (!destination || !destination.trim()) {
+        return res.status(400).json({ error: 'Informe o destino previsto para o material.' });
+    }
+
+    try {
+        const [item, cooperative] = await Promise.all([
+            db.get("SELECT * FROM items WHERE id = ?", [id]),
+            db.get("SELECT * FROM cooperatives WHERE id = ?", [req.user.id])
+        ]);
+
+        if (!item) return res.status(404).json({ error: 'Lote não encontrado.' });
+        if (item.status !== 'collected') {
+            return res.status(409).json({ error: 'Este lote não está aguardando recebimento.' });
+        }
+
+        const homologatedAt = new Date().toISOString();
+        const receiptNumber = `GT-${req.user.id}-${Date.now().toString(36).toUpperCase()}`;
+
+        await db.run(`
+            UPDATE items
+            SET status = 'homologated', cooperative_id = ?, homologated_weight_kg = ?,
+                homologated_type = ?, final_destination = ?, receipt_number = ?, homologated_at = ?
+            WHERE id = ?
+        `, [req.user.id, parsedWeight, materialType, destination.trim(), receiptNumber, homologatedAt, id]);
+
+        await traceabilityService.addLedgerEntry(id, 'COOP_RECEIPT', req.user.id, 'cooperative', {
+            cooperative_name: cooperative?.name || 'Cooperativa cadastrada',
+            declared_weight_kg: Number(item.weight_kg || 0),
+            measured_weight_kg: parsedWeight,
+            declared_type: item.type,
+            verified_type: materialType,
+            final_destination: destination.trim(),
+            receipt_number: receiptNumber,
+            homologated_at: homologatedAt
+        });
+
+        await db.run(`
+            UPDATE cooperatives
+            SET total_received_kg = total_received_kg + ?,
+                homologations_count = homologations_count + 1
+            WHERE id = ?
+        `, [parsedWeight, req.user.id]);
+
+        const updated = await db.get("SELECT * FROM items WHERE id = ?", [id]);
+        res.json({ success: true, lot: updated, receiptNumber });
+    } catch (err) {
+        console.error('Erro ao homologar lote:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -512,8 +1077,12 @@ app.get('/api/history', async (req, res) => {
     let query = '';
     if (role === 'producer') {
         query = "SELECT * FROM items WHERE producer_id = ? ORDER BY created_at DESC";
-    } else {
+    } else if (role === 'collector') {
         query = "SELECT * FROM items WHERE collector_id = ? ORDER BY collected_at DESC";
+    } else if (role === 'cooperative') {
+        query = "SELECT * FROM items WHERE cooperative_id = ? ORDER BY homologated_at DESC";
+    } else {
+        return res.status(400).json({ error: 'Perfil inválido' });
     }
 
     try {
@@ -588,7 +1157,8 @@ app.put('/api/user', async (req, res) => {
 
     if (!id || !role) return res.status(400).json({ error: 'Missing id or role' });
 
-    const table = role === 'producer' ? 'producers' : 'collectors';
+    const table = getUserTable(role);
+    if (!table) return res.status(400).json({ error: 'Perfil inválido' });
     try {
         await db.run(`UPDATE ${table} SET name = ?, email = ?, phone = ? WHERE id = ?`,
             [name, email, phone, id]);
@@ -608,7 +1178,10 @@ app.put('/api/user/points', async (req, res) => {
     if (!id || !role || points === undefined) {
         return res.status(400).json({ error: 'Missing id, role, or points' });
     }
-    const table = role === 'producer' ? 'producers' : 'collectors';
+    const table = getUserTable(role);
+    if (!table || role === 'cooperative') {
+        return res.status(400).json({ error: 'Pontos não se aplicam a este perfil' });
+    }
     try {
         await db.run(`UPDATE ${table} SET points = ? WHERE id = ?`, [points, id]);
         res.json({ success: true, points });
@@ -626,7 +1199,15 @@ app.put('/api/user/points', async (req, res) => {
 app.get('/api/traceability/:itemId', async (req, res) => {
     const { itemId } = req.params;
     try {
-        const item = await db.get("SELECT items.*, producers.name as producer_name, collectors.name as collector_name FROM items LEFT JOIN producers ON items.producer_id = producers.id LEFT JOIN collectors ON items.collector_id = collectors.id WHERE items.id = ?", [itemId]);
+        const item = await db.get(`
+            SELECT items.*, producers.name AS producer_name, collectors.name AS collector_name,
+                   cooperatives.name AS cooperative_name
+            FROM items
+            LEFT JOIN producers ON items.producer_id = producers.id
+            LEFT JOIN collectors ON items.collector_id = collectors.id
+            LEFT JOIN cooperatives ON items.cooperative_id = cooperatives.id
+            WHERE items.id = ?
+        `, [itemId]);
         
         if (!item) return res.status(404).json({ error: 'Item não encontrado' });
 

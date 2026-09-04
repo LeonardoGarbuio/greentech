@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:server": "cd server && node index.js",
+    "dev:server": "cd server && node --use-system-ca index.js",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "server": "cd server && node index.js"
+    "server": "cd server && node --use-system-ca index.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

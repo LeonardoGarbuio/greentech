@@ -30,13 +30,11 @@ const PostItem = ({ onBack, onAddItem }) => {
                     setAiDetails(null);
                     const aiResult = await api.analyzeImage(base64Data);
                     setAnalyzingImage(false);
+                    setAiDetails(aiResult);
 
                     if (aiResult.isFake) {
-                        setFraudError(aiResult.fraudReason || "Alerta de fraude! Imagem inválida ou tela detectada.");
-                        alert(`⚠️ Alerta Antifraude: ${aiResult.fraudReason}`);
+                        setFraudError(aiResult.fraudReason || "A triagem identificou uma imagem que precisa de revisão.");
                     } else {
-                        setAiDetails(aiResult);
-                        
                         // Auto-populate type & weight based on AI
                         if (aiResult.materials && aiResult.materials.length > 0) {
                             const mainMaterial = aiResult.materials[0].type;
@@ -208,7 +206,24 @@ const PostItem = ({ onBack, onAddItem }) => {
                         gap: '10px'
                     }}>
                         <span className="material-symbols-outlined" style={{ animation: 'spin 1.5s linear infinite', fontSize: '1.2rem' }}>progress_activity</span>
-                        <span>🤖 Copiloto IA analisando a imagem para classificar os materiais e prevenir fraudes...</span>
+                        <span>Triagem assistida analisando a imagem. O resultado deverá ser confirmado por você.</span>
+                    </div>
+                )}
+
+                {aiDetails && !analyzingImage && (
+                    <div style={{
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        border: `1px solid ${aiDetails.analysisMode === 'live' ? '#93c5fd' : '#fcd34d'}`,
+                        background: aiDetails.analysisMode === 'live' ? '#eff6ff' : '#fffbeb',
+                        color: aiDetails.analysisMode === 'live' ? '#1e40af' : '#92400e',
+                        fontSize: '0.78rem',
+                        lineHeight: 1.45
+                    }}>
+                        <strong style={{ display: 'block', marginBottom: '3px' }}>
+                            {aiDetails.analysisMode === 'live' ? 'IA ativa · Google Gemini' : 'Modo demonstração · resultado simulado'}
+                        </strong>
+                        {aiDetails.disclaimer}
                     </div>
                 )}
 
@@ -225,7 +240,7 @@ const PostItem = ({ onBack, onAddItem }) => {
                         gap: '8px'
                     }}>
                         <span>⚠️</span>
-                        <span><strong>Alerta Antifraude:</strong> {fraudError}</span>
+                        <span><strong>Revisão necessária:</strong> {fraudError} Confirme manualmente antes de continuar.</span>
                     </div>
                 )}
 
@@ -238,25 +253,25 @@ const PostItem = ({ onBack, onAddItem }) => {
                         boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)',
                         fontFamily: "'Outfit', sans-serif"
                     }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: '#047857', fontWeight: 800 }}>🤖 Análise da IA Concluída!</h4>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: '#047857', fontWeight: 800 }}>Triagem assistida concluída</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: '#065f46' }}>
                             <div>
                                 <strong>Materiais Detectados:</strong>
                                 <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
-                                    {aiDetails.materials.map((m, idx) => (
+                                    {(aiDetails.materials || []).map((m, idx) => (
                                         <li key={idx}>
-                                            {m.label} ({m.weightKg.toFixed(2)} kg)
+                                            {m.label} ({Number(m.weightKg || 0).toFixed(2)} kg)
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1.5px dashed #a7f3d0', paddingTop: '8px', marginTop: '4px' }}>
-                                <span>Peso Total IA:</span>
-                                <strong>{aiDetails.totalWeightKg.toFixed(2)} KG</strong>
+                                <span>Peso sugerido:</span>
+                                <strong>{Number(aiDetails.totalWeightKg || 0).toFixed(2)} KG</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>Estimativa de ganho do catador:</span>
-                                <strong>R$ {aiDetails.estimatedEarnings.toFixed(2)}</strong>
+                                <strong>R$ {Number(aiDetails.estimatedEarnings || 0).toFixed(2)}</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#047857', fontWeight: 800 }}>
                                 <span>GreenCoins (GC) estimadas:</span>

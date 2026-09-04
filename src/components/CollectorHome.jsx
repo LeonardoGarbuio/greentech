@@ -5,8 +5,6 @@ import CoinBadge from './CoinBadge';
 const CollectorHome = ({ onNavigate, user: currentUser }) => {
     const [stats, setStats] = useState({ earnings: 0, collections: 0 });
     const [history, setHistory] = useState([]);
-    const [forecast, setForecast] = useState(null);
-    const [loadingForecast, setLoadingForecast] = useState(true);
 
     useEffect(() => {
         if (!currentUser || !currentUser.id) return;
@@ -25,16 +23,6 @@ const CollectorHome = ({ onNavigate, user: currentUser }) => {
                 // Ensure historyData is an array before setting
                 setHistory(Array.isArray(historyData) ? historyData : []);
 
-                // Fetch AI Forecast
-                try {
-                    setLoadingForecast(true);
-                    const forecastData = await api.getFinancialForecast(currentUser.id);
-                    setForecast(forecastData);
-                } catch (e) {
-                    console.error("Erro ao carregar forecast:", e);
-                } finally {
-                    setLoadingForecast(false);
-                }
             } catch (error) {
                 console.error('Error fetching collector data:', error);
             }
@@ -145,117 +133,32 @@ const CollectorHome = ({ onNavigate, user: currentUser }) => {
                 </div>
             </div>
 
-            {/* Copiloto Financeiro Panel */}
-            <div style={{ padding: '0 24px', marginBottom: '24px' }}>
-                <div style={{
-                    background: 'white',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '24px',
-                    border: '1.5px solid var(--surface-border)',
-                    boxShadow: 'var(--shadow-sm)',
-                    fontFamily: "'Outfit', sans-serif"
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '8px', color: 'var(--primary-color)' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="20" x2="18" y2="10"></line>
-                                <line x1="12" y1="20" x2="12" y2="4"></line>
-                                <line x1="6" y1="20" x2="6" y2="14"></line>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                                Planejamento Financeiro
-                            </h3>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                Metas inteligentes com base na sua média de coletas.
-                            </p>
-                        </div>
-                    </div>
-
-                    {loadingForecast ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 0' }}>
-                            <div style={{
-                                width: '20px',
-                                height: '20px',
-                                border: '3px solid var(--primary-light)',
-                                borderTop: '3px solid var(--primary-color)',
-                                borderRadius: '50%',
-                                animation: 'spin 1s linear infinite'
-                            }} />
-                            <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Analisando padrões e calculando projeções...</span>
-                            <style>{`
-                                @keyframes spin { to { transform: rotate(360deg); } }
-                            `}</style>
-                        </div>
-                    ) : forecast ? (
-                        <div>
-                            {/* Forecast Metrics */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                                <div style={{
-                                    background: '#f8fafc',
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    border: '1px solid var(--surface-border)'
-                                }}>
-                                    <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '4px' }}>Meta Próx. Mês</span>
-                                    <span style={{ fontSize: '1.4rem', fontWeight: '800', color: '#27ae60' }}>R$ {forecast.nextMonthForecast}</span>
-                                </div>
-                                <div style={{
-                                    background: '#f8fafc',
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    border: '1px solid var(--surface-border)'
-                                }}>
-                                    <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '4px' }}>Potencial de Alta</span>
-                                    <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--primary-color)' }}>+{forecast.growthPotentialPercentage}%</span>
-                                </div>
-                            </div>
-
-                            {/* Tips */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.5px' }}>
-                                    Como atingir a meta:
-                                </span>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {forecast.tips && forecast.tips.map((tip, idx) => (
-                                        <div key={idx} style={{
-                                            display: 'flex',
-                                            gap: '10px',
-                                            alignItems: 'flex-start',
-                                            background: '#fcfcfc',
-                                            padding: '12px 14px',
-                                            borderRadius: '10px',
-                                            border: '1px solid rgba(0,0,0,0.03)',
-                                            fontSize: '0.85rem',
-                                            lineHeight: 1.4
-                                        }}>
-                                            <span style={{ color: 'var(--primary-color)', fontWeight: '800' }}>{idx + 1}.</span>
-                                            <span style={{ color: 'var(--text-primary)' }}>{tip}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Motivation */}
-                            <div style={{
-                                borderTop: '1px solid var(--surface-border)',
-                                paddingTop: '16px',
-                                fontSize: '0.85rem',
-                                color: 'var(--text-secondary)',
-                                display: 'flex',
-                                gap: '8px',
-                                alignItems: 'flex-start',
-                                lineHeight: 1.4
-                            }}>
-                                <span style={{ fontSize: '1.1rem' }}>💡</span>
-                                <span style={{ fontStyle: 'italic' }}>"{forecast.motivationalMessage}"</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#e74c3c', fontWeight: '500' }}>Não foi possível carregar as previsões financeiras.</p>
-                    )}
-                </div>
+            <div style={{ padding: '0 24px 24px' }}>
+                <button
+                    onClick={() => onNavigate('impact')}
+                    style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        color: 'var(--text-primary)',
+                        background: 'white',
+                        border: '1px solid var(--surface-border)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--primary-color)' }}>monitoring</span>
+                        <span>
+                            <strong style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700' }}>Ver meu impacto</strong>
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Renda, materiais e cadeia circular</small>
+                        </span>
+                    </span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '19px', color: 'var(--text-secondary)' }}>chevron_right</span>
+                </button>
             </div>
 
             {/* Primary Actions - Hybrid Style (Matches Home.jsx) */}

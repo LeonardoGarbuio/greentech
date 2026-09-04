@@ -18,7 +18,7 @@ const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
-const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, currentUserId }) => {
+const Dashboard = ({ items, onAccept, onDelete, onNavigate, userRole, currentUserId }) => {
     const [selectedItemId, setSelectedItemId] = useState(null);
     const [activeCategory, setActiveCategory] = useState('all');
 
@@ -29,13 +29,38 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
     const [filterWeight, setFilterWeight] = useState(0); // kg
     const [searchQuery, setSearchQuery] = useState('');
     const [mapCenter, setMapCenter] = useState(null);
+    const [cooperatives, setCooperatives] = useState([]);
+    const [cooperativesLoading, setCooperativesLoading] = useState(false);
+    const [cooperativeWarning, setCooperativeWarning] = useState(null);
+    const [locationUnavailable, setLocationUnavailable] = useState(false);
+    const [userCoords, setUserCoords] = useState(null);
 
     // Derive selected item from props to ensure it's always fresh
     const selectedItem = items.find(i => i.id === selectedItemId) || null;
 
     const [optimizedRoute, setOptimizedRoute] = useState(null);
-    const [isOptimizing, setIsOptimizing] = useState(false);
-    const [userCoords, setUserCoords] = useState(null);
+    const [, setIsOptimizing] = useState(false);
+
+    useEffect(() => {
+        if (userRole !== 'collector' || !userCoords) return;
+        let active = true;
+        setCooperativesLoading(true);
+        setCooperativeWarning(null);
+        api.getCooperatives(userCoords)
+            .then((data) => {
+                if (!active) return;
+                setCooperatives(Array.isArray(data.cooperatives) ? data.cooperatives : []);
+                setCooperativeWarning(data.warning || null);
+            })
+            .catch((error) => {
+                console.error('Erro ao carregar cooperativas:', error);
+                if (active) setCooperativeWarning('Não foi possível consultar a rede agora. Tente novamente em instantes.');
+            })
+            .finally(() => {
+                if (active) setCooperativesLoading(false);
+            });
+        return () => { active = false; };
+    }, [userRole, userCoords]);
 
     const categories = [
         { id: 'all', name: 'Todos', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg> },
@@ -79,6 +104,43 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
         });
     }, [items, activeCategory, filterWeight, userRole, userCoords]);
 
+    const recommendedCooperative = useMemo(() => {
+        if (!userCoords || cooperatives.length === 0) return null;
+
+        const finalCollectionId = optimizedRoute?.optimizedRoute?.at(-1);
+        const finalCollection = finalCollectionId
+            ? items.find((item) => item.id === finalCollectionId)
+            : null;
+        const origin = finalCollection?.lat && (finalCollection.lng || finalCollection.lon)
+            ? { lat: finalCollection.lat, lng: finalCollection.lng || finalCollection.lon }
+            : userCoords;
+
+        const verifiedDestinations = cooperatives.filter((cooperative) => cooperative.location_verified);
+        const eligibleDestinations = cooperatives.filter((cooperative) => cooperative.route_eligible);
+        if (eligibleDestinations.length === 0 && verifiedDestinations.length === 0) return null;
+        const namedDestinations = eligibleDestinations.filter((cooperative) => cooperative.name !== 'Ponto de reciclagem');
+        const destinationPool = verifiedDestinations.length > 0
+            ? verifiedDestinations
+            : namedDestinations.length > 0
+                ? namedDestinations
+                : eligibleDestinations;
+
+        return [...destinationPool].sort((first, second) => (
+            getDistanceInMeters(origin.lat, origin.lng, first.lat, first.lng)
+            - getDistanceInMeters(origin.lat, origin.lng, second.lat, second.lng)
+        ))[0];
+    }, [cooperatives, items, optimizedRoute, userCoords]);
+
+    const recommendedDistanceKm = recommendedCooperative && userCoords
+        ? getDistanceInMeters(userCoords.lat, userCoords.lng, recommendedCooperative.lat, recommendedCooperative.lng) / 1000
+        : null;
+
+    const displayedCooperatives = useMemo(() => {
+        const officialLocations = cooperatives.filter((cooperative) => cooperative.data_source !== 'OpenStreetMap');
+        if (officialLocations.length > 0) return officialLocations;
+        return cooperatives;
+    }, [cooperatives]);
+
     // Monitor geolocation in real time
     useEffect(() => {
         if (userRole !== 'collector') return;
@@ -89,6 +151,7 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
             const newLat = position.coords.latitude;
             const newLng = position.coords.longitude;
             console.log("Collector auto-position resolved:", newLat, newLng);
+            setLocationUnavailable(false);
 
             setUserCoords(prevCoords => {
                 if (!prevCoords) {
@@ -107,7 +170,7 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
 
         const handlePositionError = (error) => {
             console.error("WatchPosition error:", error);
-            setUserCoords(prev => prev || { lat: -23.5505, lng: -46.6333 }); // default SP coord
+            setLocationUnavailable(true);
         };
 
         if (navigator.geolocation) {
@@ -118,7 +181,7 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
             );
         } else {
             console.warn("Geolocation API not supported.");
-            setUserCoords({ lat: -23.5505, lng: -46.6333 });
+            setLocationUnavailable(true);
         }
 
         return () => {
@@ -165,7 +228,12 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
                 const data = await api.searchAddress(searchQuery);
                 if (data && data.length > 0) {
                     const { lat, lon } = data[0];
-                    setMapCenter([parseFloat(lat), parseFloat(lon)]);
+                    const searchedCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
+                    setMapCenter([searchedCoords.lat, searchedCoords.lng]);
+                    if (userRole === 'collector') {
+                        setUserCoords(searchedCoords);
+                        setLocationUnavailable(false);
+                    }
                 } else {
                     alert('Endereço não encontrado');
                 }
@@ -190,10 +258,13 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
             }}>
                 <MapComponent
                     items={filteredItems}
+                    cooperatives={displayedCooperatives}
                     onMarkerClick={(item) => setSelectedItemId(item.id)}
                     center={mapCenter}
                     optimizedRoute={optimizedRoute}
                     userCoords={userCoords}
+                    destinationCooperative={recommendedCooperative}
+                    autoRouteEnabled={Boolean(recommendedCooperative) && (filteredItems.length === 0 || Boolean(optimizedRoute?.optimizedRoute?.length))}
                 />
             </div>
 
@@ -436,8 +507,40 @@ const Dashboard = ({ items, onAccept, onDelete, onLogout, onNavigate, userRole, 
             )}
 
 
-            {/* SP COOPERATIVE RECOMMENDATIONS (Melhores Preços SP) */}
+            {/* Recomendação automática compacta: o mapa já desenha a rota até o melhor destino. */}
             {userRole === 'collector' && filteredItems.length === 0 && (
+                <div style={{
+                    position: 'absolute', bottom: '100px', left: '20px', width: 'calc(100% - 40px)', maxWidth: '480px',
+                    background: 'rgba(255, 255, 255, 0.96)', backdropFilter: 'blur(16px)', border: '1px solid rgba(226, 232, 240, 0.9)',
+                    borderRadius: '20px', padding: '14px 16px', boxShadow: '0 14px 30px rgba(0, 0, 0, 0.12)', zIndex: 30,
+                    fontFamily: "'Outfit', sans-serif"
+                }}>
+                    {recommendedCooperative ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span className="material-symbols-outlined" style={{ width: '42px', height: '42px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'grid', placeItems: 'center', flexShrink: 0 }}>route</span>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                                <span style={{ display: 'block', fontSize: '.62rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '.9px' }}>Rota automática pronta</span>
+                                <strong style={{ display: 'block', marginTop: '2px', color: '#1e293b', fontSize: '.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{recommendedCooperative.name}</strong>
+                                <span style={{ display: 'block', marginTop: '2px', color: recommendedCooperative.location_verified ? '#64748b' : '#b45309', fontSize: '.68rem' }}>
+                                    {recommendedCooperative.location_verified ? 'Endereço confirmado' : 'Local comunitário — confirme antes de sair'} · {recommendedCooperative.data_source}
+                                </span>
+                            </div>
+                            <strong style={{ color: '#059669', fontSize: '.8rem', flexShrink: 0 }}>{recommendedDistanceKm?.toFixed(1)} km</strong>
+                        </div>
+                    ) : (
+                        <div style={{ color: cooperativeWarning ? '#b45309' : '#64748b', fontSize: '.78rem', textAlign: 'center', lineHeight: 1.4 }}>
+                            {cooperativesLoading
+                                ? 'Calculando automaticamente o melhor destino...'
+                                : displayedCooperatives.length > 0
+                                    ? 'Cobertura aproximada encontrada. Os marcadores amarelos são referências e não iniciam uma rota automática.'
+                                    : cooperativeWarning || (locationUnavailable ? 'Ative a localização ou pesquise sua cidade.' : 'Aguardando sua localização...')}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Painel anterior mantido temporariamente apenas como referência de layout. */}
+            {userRole === '__legacy__' && filteredItems.length === 0 && (
                 <div style={{
                     position: 'absolute',
                     bottom: '100px',

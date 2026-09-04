@@ -169,6 +169,34 @@ const Home = ({ onNavigate, user: currentUser }) => {
                 </div>
             </div>
 
+            <div style={{ padding: '0 24px 24px' }}>
+                <button
+                    onClick={() => onNavigate('impact')}
+                    style={{
+                        width: '100%',
+                        padding: '12px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        color: 'var(--text-primary)',
+                        background: 'white',
+                        border: '1px solid var(--surface-border)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        textAlign: 'left'
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--primary-color)' }}>monitoring</span>
+                        <span>
+                            <strong style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700' }}>Ver meu impacto</strong>
+                            <small style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Veja os resultados da sua reciclagem</small>
+                        </span>
+                    </span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '19px', color: 'var(--text-secondary)' }}>chevron_right</span>
+                </button>
+            </div>
+
             {/* Primary Actions - Hybrid Style */}
             <div style={{ padding: '0 24px' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>O que vamos fazer hoje?</h3>

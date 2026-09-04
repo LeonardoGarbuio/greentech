@@ -167,8 +167,8 @@ export const api = {
 
     // External Services
     searchAddress: async (query) => {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Failed to search address');
+        const response = await fetch(`${API_BASE_URL}/geocode?q=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Erro ao localizar cidade ou endereço');
         return response.json();
     },
 
@@ -248,6 +248,17 @@ export const api = {
             body: JSON.stringify({ collectorId, currentCoords, activePoints })
         });
         if (!response.ok) throw new Error('Erro ao otimizar rota com IA');
+        const data = await response.json();
+        return data.analysis || data;
+    },
+
+    getCooperatives: async (coords, radius = 30000) => {
+        if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
+            throw new Error('Localização necessária para buscar a rede de reciclagem');
+        }
+        const query = `?lat=${encodeURIComponent(coords.lat)}&lng=${encodeURIComponent(coords.lng)}&radius=${encodeURIComponent(radius)}`;
+        const response = await fetch(`${API_BASE_URL}/cooperatives${query}`);
+        if (!response.ok) throw new Error('Erro ao carregar a rede de reciclagem');
         return response.json();
     },
 
@@ -269,14 +280,19 @@ export const api = {
     },
 
     // Atualização especializada para Cooperativa Homologar
-    coopHomologateItem: async (itemId, weightCoop) => {
-        const response = await fetch(`${API_BASE_URL}/items/${itemId}/status`, {
-            method: 'PUT',
+    getCooperativeLots: async () => {
+        const response = await fetch(`${API_BASE_URL}/cooperative/lots`, {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Erro ao carregar lotes da cooperativa');
+        return response.json();
+    },
+
+    coopHomologateItem: async (itemId, { weightKg, materialType, destination }) => {
+        const response = await fetch(`${API_BASE_URL}/cooperative/lots/${itemId}/homologate`, {
+            method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ 
-                status: 'homologated', 
-                weightCoop 
-            })
+            body: JSON.stringify({ weightKg, materialType, destination })
         });
         if (!response.ok) throw new Error('Erro ao homologar item na cooperativa');
         return response.json();

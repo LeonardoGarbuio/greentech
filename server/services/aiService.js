@@ -1,4 +1,4 @@
-import db from '../db-sqlite.js';
+import db from '../db.js';
 
 // Get Gemini Key from Environment or use demo fallback
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
@@ -11,7 +11,7 @@ export const aiService = {
         try {
             if (!GEMINI_API_KEY) {
                 console.log("[AI SERVICE] Chave GEMINI_API_KEY não configurada. Usando Fallback de Alta Fidelidade.");
-                return generateMockImageAnalysis(base64Image);
+                return addAnalysisMetadata(generateMockImageAnalysis(base64Image), 'demo');
             }
 
             console.log("[AI SERVICE] Enviando imagem ao Gemini 2.0 Flash...");
@@ -78,11 +78,11 @@ export const aiService = {
             const textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
             console.log("[AI SERVICE] Gemini Response:", textResponse);
 
-            return JSON.parse(textResponse.trim());
+            return addAnalysisMetadata(JSON.parse(textResponse.trim()), 'live');
         } catch (err) {
             console.error("[AI SERVICE] Erro ao chamar Gemini Vision API:", err.message);
             console.log("[AI SERVICE] Usando Fallback de Imagem...");
-            return generateMockImageAnalysis(base64Image);
+            return addAnalysisMetadata(generateMockImageAnalysis(base64Image), 'demo');
         }
     },
 
@@ -96,13 +96,15 @@ export const aiService = {
                     optimizedRoute: [],
                     totalDistanceEstimation: "0 km",
                     fuelSavedPercentage: 0,
-                    reasoning: "Sem coletas ativas selecionadas para otimizar rota."
+                    reasoning: "Sem coletas ativas selecionadas para otimizar rota.",
+                    optimizationMode: 'heuristic',
+                    optimizationProvider: 'Heurística geográfica local'
                 };
             }
 
             if (!GEMINI_API_KEY) {
-                console.log("[AI SERVICE] Chave GEMINI_API_KEY ausente. Usando rota otimizada via simulação matemática.");
-                return generateMockRouteOptimization(currentCoords, activePoints);
+                console.log("[AI SERVICE] Chave GEMINI_API_KEY ausente. Usando heurística geográfica local.");
+                return generateHeuristicRouteOptimization(currentCoords, activePoints);
             }
 
             console.log(`[AI SERVICE] Chamando Gemini para otimizar rota com ${activePoints.length} pontos...`);
@@ -111,10 +113,8 @@ export const aiService = {
             O coletor está na localização atual (Lat: ${currentCoords.lat}, Lng: ${currentCoords.lng}) e deseja coletar os seguintes pontos de descarte ativos (IDs e coordenadas):
             ${JSON.stringify(activePoints.map(p => ({ id: p.id, lat: p.lat, lng: p.lng, type: p.type, weight: p.weight_kg })))}
             
-            O destino final ideal do coletor para descarregar o material é a cooperativa local, localizada em (Lat: -23.5560, Lng: -46.6390) [ou similar em São Paulo/região].
-            
             Ordene as paradas (IDs dos pontos) na sequência física mais lógica, rápida e econômica em combustível para o coletor.
-            Evite trajetos em zigue-zague. Calcule uma estimativa de distância total e porcentagem estimada de combustível economizado graças a essa organização de trajeto.
+            Evite trajetos em zigue-zague. Ordene apenas os pontos enviados; o aplicativo acrescentará como destino a organização de reciclagem mais próxima encontrada na cidade do usuário. Calcule uma estimativa de distância total e porcentagem estimada de combustível economizado graças a essa organização de trajeto.
             
             Forneça a resposta estritamente em formato JSON válido usando esta estrutura:
             {
@@ -140,10 +140,14 @@ export const aiService = {
 
             const result = await response.json();
             const textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            return JSON.parse(textResponse.trim());
+            return {
+                ...JSON.parse(textResponse.trim()),
+                optimizationMode: 'live',
+                optimizationProvider: 'Google Gemini'
+            };
         } catch (err) {
             console.error("[AI SERVICE] Erro ao otimizar rota:", err.message);
-            return generateMockRouteOptimization(currentCoords, activePoints);
+            return generateHeuristicRouteOptimization(currentCoords, activePoints);
         }
     },
 
@@ -151,11 +155,13 @@ export const aiService = {
      * Gera uma previsão financeira e metas de crescimento mensais baseada no histórico do catador
      */
     getFinancialForecast: async (collectorId) => {
+        let earnings = 0;
+        let collectionsCount = 0;
         try {
             // Buscar dados reais do catador no banco
             const collector = await db.get("SELECT earnings, collections_count FROM collectors WHERE id = ?", [collectorId]);
-            const earnings = collector ? collector.earnings : 350.00;
-            const collectionsCount = collector ? collector.collections_count : 12;
+            earnings = collector ? collector.earnings : 350.00;
+            collectionsCount = collector ? collector.collections_count : 12;
 
             if (!GEMINI_API_KEY) {
                 return generateMockForecast(earnings, collectionsCount);
@@ -164,14 +170,14 @@ export const aiService = {
             console.log(`[AI SERVICE] Gerando previsão financeira para Coletor ${collectorId}...`);
 
             const prompt = `Você é o planejador financeiro e coach de produtividade dos catadores de recicláveis da Greentech.
-            Analise estes dados do mês atual de um coletor de São Paulo (SP):
+            Analise estes dados do mês atual de um coletor de materiais recicláveis no Brasil:
             - Faturamento acumulado: R$ ${earnings.toFixed(2)}
             - Total de coletas realizadas: ${collectionsCount}
             
             Determine:
             1. Uma previsão realista de ganho para o próximo mês ("nextMonthForecast") se ele mantiver a frequência.
             2. Potencial de crescimento percentual máximo ("growthPotentialPercentage") se ele aplicar técnicas de otimização de rotas e focar em materiais de alto valor (como latas de alumínio e PET limpo).
-            3. Três dicas muito práticas, objetivas e contextualizadas para São Paulo/bairros (ou conselhos universais de alta qualidade) sobre como aumentar os ganhos em até 40%.
+            3. Três dicas práticas e objetivas, apropriadas à realidade brasileira, sobre como organizar melhor o trabalho e aumentar os ganhos sem inventar preços locais.
             4. Uma mensagem curta, humana e muito motivadora para animar o trabalho dele.
             
             Responda estritamente em JSON válido com as chaves:
@@ -207,6 +213,19 @@ export const aiService = {
 };
 
 // --- MOCK FALLBACK GENERATORS (Demo Safe & Offline Proof) ---
+
+function addAnalysisMetadata(analysis, mode) {
+    const isLive = mode === 'live';
+    return {
+        ...analysis,
+        analysisMode: mode,
+        analysisProvider: isLive ? 'Google Gemini' : 'Simulação local',
+        requiresHumanConfirmation: true,
+        disclaimer: isLive
+            ? 'Triagem assistida por IA. Confirme o material e o peso antes de publicar.'
+            : 'Modo demonstração: resultado simulado, sem análise real da imagem. Confirme e corrija os dados manualmente.'
+    };
+}
 
 function generateMockImageAnalysis(base64Image) {
     // Apenas simular baseado se a imagem é muito curta ou representativa
@@ -264,22 +283,35 @@ function generateMockImageAnalysis(base64Image) {
     }
 }
 
-function generateMockRouteOptimization(currentCoords, activePoints) {
-    // Ordenar por distância euclidiana simples para simular inteligência
-    const sorted = [...activePoints].sort((a, b) => {
-        const distA = Math.pow(a.lat - currentCoords.lat, 2) + Math.pow(a.lng - currentCoords.lng, 2);
-        const distB = Math.pow(b.lat - currentCoords.lat, 2) + Math.pow(b.lng - currentCoords.lng, 2);
-        return distA - distB;
-    });
+function generateHeuristicRouteOptimization(currentCoords, activePoints) {
+    // Heurística do vizinho mais próximo: cada nova parada parte da anterior.
+    const remaining = [...activePoints];
+    const sorted = [];
+    let current = currentCoords;
+    while (remaining.length > 0) {
+        let nearestIndex = 0;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        remaining.forEach((point, index) => {
+            const distance = Math.pow(point.lat - current.lat, 2) + Math.pow(point.lng - current.lng, 2);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = index;
+            }
+        });
+        const [nearest] = remaining.splice(nearestIndex, 1);
+        sorted.push(nearest);
+        current = { lat: nearest.lat, lng: nearest.lng };
+    }
 
     const ids = sorted.map(p => p.id);
-    const count = activePoints.length;
 
     return {
         optimizedRoute: ids,
-        totalDistanceEstimation: `${(count * 1.4 + 0.8).toFixed(1)} km`,
-        fuelSavedPercentage: Math.floor(15 + Math.random() * 15),
-        reasoning: "⚡ Rota Inteligente calculada com sucesso pelo copiloto Greentech! Os pontos foram ordenados pela menor distância geográfica. Dica: Comece coletando pelo ponto mais próximo para economizar tempo inicial e faça uma reta contínua até a cooperativa local, economizando energia."
+        totalDistanceEstimation: null,
+        fuelSavedPercentage: null,
+        reasoning: "Ordem calculada por proximidade geográfica entre as paradas. Distância viária e economia de combustível não foram estimadas.",
+        optimizationMode: 'heuristic',
+        optimizationProvider: 'Heurística geográfica local'
     };
 }
 
@@ -289,9 +321,9 @@ function generateMockForecast(earnings, collectionsCount) {
         nextMonthForecast: parseFloat(projected.toFixed(2)),
         growthPotentialPercentage: 35,
         tips: [
-            "Foque em Alumínio: As latas de alumínio pagam R$ 7,50/kg em média na cooperativa central em SP, enquanto o vidro comum paga R$ 0,35. Priorizar latinhas duplica sua renda.",
-            "Rota dos Parques no Fim de Semana: A geolocalização aponta alta postagem de garrafas plásticas (PET) ao redor do Parque do Ibirapuera aos sábados das 14h às 19h.",
-            "Separação Prévia de Papelão: Entregar papelão limpo e desmontado aumenta a velocidade de aceitação em até 2x nas esteiras de triagem da Coopercaps."
+            "Separe e mantenha secos os materiais de maior valor; confirme os preços praticados diretamente com a organização de destino.",
+            "Agrupe coletas do mesmo bairro para reduzir deslocamentos, tempo e combustível.",
+            "Confirme com a associação de destino quais materiais são recebidos e os valores praticados antes de iniciar a rota."
         ],
         motivationalMessage: "Seu trabalho sustenta o planeta e alimenta a economia circular. Utilizando as rotas inteligentes, estimamos que você possa bater sua meta mensal em apenas 18 dias de trabalho. Continue firme!"
     };
